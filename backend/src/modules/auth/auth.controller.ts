@@ -24,6 +24,10 @@ export class AuthController {
 
   @Post("login")
   async passwordLogin(@Body() dto: PasswordLoginDto) {
-    return this.authService.loginWithPassword(dto.phone, dto.password, dto.email);
+    return this.authService.loginWithPassword(
+      dto.identifier,
+      dto.password,
+      dto.email
+    );
   }
 }

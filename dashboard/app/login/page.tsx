@@ -29,7 +29,7 @@ const IMAGE_POOL = [
 
 export default function LoginPage() {
   const router = useRouter();
-  const [phone, setPhone] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
@@ -70,7 +70,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const res = await api.post("/auth/login", {
-        phone: phone.trim(),
+        identifier: identifier.trim(),
         email: email.trim() || undefined,
         password: password.trim(),
       });
@@ -109,12 +109,12 @@ export default function LoginPage() {
         </div>
 
         <div className="login-body">
-          <label>Admin Phone</label>
+          <label>Phone or Email</label>
           <input
-            type="tel"
-            placeholder="2547xxxxxxxx"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            type="text"
+            placeholder="2547xxxxxxxx or admin@example.com"
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
             disabled={loading}
           />
           <label>Email (optional)</label>
@@ -141,7 +141,7 @@ export default function LoginPage() {
           <div className="login-actions">
             <button
               onClick={login}
-              disabled={loading || !phone.trim() || !password.trim()}
+              disabled={loading || !identifier.trim() || !password.trim()}
             >
               {loading ? "Signing in..." : "Sign In"}
             </button>

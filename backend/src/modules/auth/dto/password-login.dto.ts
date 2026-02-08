@@ -3,7 +3,7 @@ import { IsNotEmpty, IsOptional, IsString } from "class-validator";
 export class PasswordLoginDto {
   @IsString()
   @IsNotEmpty()
-  phone!: string;
+  identifier!: string;
 
   @IsString()
   @IsOptional()

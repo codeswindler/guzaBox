@@ -84,8 +84,14 @@ export class AuthService {
     return { token };
   }
 
-  async loginWithPassword(phone: string, password: string, email?: string) {
-    const admin = await this.adminRepo.findOne({ where: { phone } });
+  async loginWithPassword(
+    identifier: string,
+    password: string,
+    email?: string
+  ) {
+    const admin = await this.adminRepo.findOne({
+      where: [{ phone: identifier }, { email: identifier }],
+    });
     if (!admin || !admin.isActive) {
       throw new UnauthorizedException("Admin not found or inactive.");
     }
