@@ -130,8 +130,20 @@ export default function LoginPage() {
               className="password-toggle"
               onClick={() => setShowPassword((prev) => !prev)}
               disabled={loading}
+              aria-label={showPassword ? "Hide password" : "Show password"}
             >
-              {showPassword ? "Hide" : "Show"}
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d={
+                    showPassword
+                      ? "M12 5c5.05 0 9.27 3.1 10.9 7.5C21.27 16.9 17.05 20 12 20S2.73 16.9 1.1 12.5C2.73 8.1 6.95 5 12 5zm0 2c-3.79 0-7.05 2.22-8.57 5.5C4.95 15.78 8.21 18 12 18s7.05-2.22 8.57-5.5C19.05 9.22 15.79 7 12 7zm0 2.5A3.5 3.5 0 1 1 8.5 13 3.5 3.5 0 0 1 12 9.5z"
+                      : "M12 5c5.05 0 9.27 3.1 10.9 7.5C21.27 16.9 17.05 20 12 20S2.73 16.9 1.1 12.5C2.73 8.1 6.95 5 12 5zm0 2c-3.79 0-7.05 2.22-8.57 5.5C4.95 15.78 8.21 18 12 18s7.05-2.22 8.57-5.5C19.05 9.22 15.79 7 12 7z"
+                  }
+                />
+                <path
+                  d={showPassword ? "" : "M12 9.5A3.5 3.5 0 1 0 15.5 13 3.5 3.5 0 0 0 12 9.5z"}
+                />
+              </svg>
             </button>
           </div>
 

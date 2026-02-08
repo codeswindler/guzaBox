@@ -172,11 +172,21 @@ html {
   border: 1px solid rgba(66, 170, 255, 0.3);
   color: #e2e8f0;
   font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 46px;
 }
 
 .password-toggle:hover {
   background: rgba(56, 189, 248, 0.2);
   color: #f8fafc;
+}
+
+.password-toggle svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
 }
 
 .login-actions {
