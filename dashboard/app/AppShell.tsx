@@ -8,6 +8,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const isLogin = pathname === "/login";
+  const [isReady, setIsReady] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const inactivityTimer = useRef<number | null>(null);
   const hasToken =
@@ -45,6 +46,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     if (!isLogin && !hasToken) {
       router.replace("/login");
     }
+    if (!isLogin) {
+      setIsReady(Boolean(hasToken));
+    } else {
+      setIsReady(true);
+    }
   }, [hasToken, isLogin, router]);
 
   useEffect(() => {
@@ -58,6 +64,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     document.addEventListener("click", handleClick);
     return () => document.removeEventListener("click", handleClick);
   }, [menuOpen]);
+
+  if (!isReady) {
+    return (
+      <div className="app-shell login-shell">
+        <div className="page login-page">
+          <div className="login-hero">
+            <div className="login-overlay" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={isLogin ? "app-shell login-shell" : "app-shell"}>
