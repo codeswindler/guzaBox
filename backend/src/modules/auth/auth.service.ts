@@ -85,8 +85,22 @@ export class AuthService {
   }
 
   async loginWithPassword(identifier: string, password: string) {
+    const adminPhone = this.configService.get<string>("ADMIN_PHONE") || "";
+    const adminEmail = this.configService.get<string>("ADMIN_EMAIL") || "";
+    const adminUsername =
+      this.configService.get<string>("ADMIN_USERNAME") || "";
+    const normalizedIdentifier = identifier.trim();
+
+    let lookupIdentifier = normalizedIdentifier;
+    if (
+      adminUsername &&
+      normalizedIdentifier.toLowerCase() === adminUsername.toLowerCase()
+    ) {
+      lookupIdentifier = adminPhone || adminEmail || normalizedIdentifier;
+    }
+
     const admin = await this.adminRepo.findOne({
-      where: [{ phone: identifier }, { email: identifier }],
+      where: [{ phone: lookupIdentifier }, { email: lookupIdentifier }],
     });
     if (!admin || !admin.isActive) {
       throw new UnauthorizedException("Admin not found or inactive.");
