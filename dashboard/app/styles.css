@@ -1009,6 +1009,64 @@ td {
   flex-wrap: wrap;
 }
 
+.filter-row input[type="datetime-local"] {
+  background: rgba(7, 15, 35, 0.7);
+  border: 1px solid rgba(66, 170, 255, 0.2);
+  color: #e6f1ff;
+  padding: 8px 12px;
+  border-radius: 10px;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.status-paid {
+  color: #0fe3a9;
+  background: rgba(15, 227, 169, 0.12);
+  border-color: rgba(15, 227, 169, 0.25);
+}
+
+.status-paid .status-dot {
+  background: #0fe3a9;
+}
+
+.status-pending {
+  color: #f5c06d;
+  background: rgba(245, 192, 109, 0.14);
+  border-color: rgba(245, 192, 109, 0.3);
+}
+
+.status-pending .status-dot {
+  background: #f5c06d;
+}
+
+.status-failed {
+  color: #ff7a8a;
+  background: rgba(255, 122, 138, 0.14);
+  border-color: rgba(255, 122, 138, 0.3);
+}
+
+.status-failed .status-dot {
+  background: #ff7a8a;
+}
+
 @media (max-width: 1024px) {
   .simulator-layout {
     grid-template-columns: 1fr;

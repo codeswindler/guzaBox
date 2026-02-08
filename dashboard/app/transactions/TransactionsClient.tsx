@@ -28,6 +28,8 @@ type Kpis = {
 export default function TransactionsClient() {
   const [items, setItems] = useState<Transaction[]>([]);
   const [status, setStatus] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const [toasts, setToasts] = useState<string[]>([]);
   const [kpis, setKpis] = useState<Kpis | null>(null);
   const [kpiRange, setKpiRange] = useState<"today" | "last7" | "allTime">(
@@ -100,10 +102,12 @@ export default function TransactionsClient() {
     }
     try {
       setError("");
+      const params: Record<string, string> = {};
+      if (status) params.status = status;
+      if (from) params.from = new Date(from).toISOString();
+      if (to) params.to = new Date(to).toISOString();
       const [txRes, kpiRes] = await Promise.all([
-        api.get("/payments/transactions", {
-          params: status ? { status } : undefined,
-        }),
+        api.get("/payments/transactions", { params }),
         api.get("/payments/kpis"),
       ]);
       const data: Transaction[] = txRes.data;
@@ -138,7 +142,7 @@ export default function TransactionsClient() {
     load();
     const timer = setInterval(load, mockEnabled ? 12000 : 10000);
     return () => clearInterval(timer);
-  }, [mockEnabled, status]);
+  }, [mockEnabled, status, from, to]);
 
   const visibleItems = status
     ? items.filter((item) => item.status === status)
@@ -247,7 +251,72 @@ export default function TransactionsClient() {
             <option value="PAID">PAID</option>
             <option value="FAILED">FAILED</option>
           </select>
+          <label>From</label>
+          <input
+            type="datetime-local"
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+          />
+          <label>To</label>
+          <input
+            type="datetime-local"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+          />
           <button onClick={load}>Refresh</button>
+          <button
+            onClick={async () => {
+              try {
+                setError("");
+                const exportParams: Record<string, string> = {};
+                if (status) exportParams.status = status;
+                if (from) exportParams.from = new Date(from).toISOString();
+                if (to) exportParams.to = new Date(to).toISOString();
+                const res = await api.get("/payments/transactions", {
+                  params: exportParams,
+                });
+                const rows: Transaction[] = res.data ?? [];
+                const header = [
+                  "id",
+                  "phoneNumber",
+                  "payerName",
+                  "amount",
+                  "box",
+                  "status",
+                  "createdAt",
+                ];
+                const csv = [
+                  header.join(","),
+                  ...rows.map((row) =>
+                    [
+                      row.id,
+                      row.phoneNumber,
+                      row.payerName ?? "",
+                      row.amount,
+                      row.box ?? "",
+                      row.status,
+                      row.createdAt,
+                    ]
+                      .map((value) =>
+                        `"${String(value).replace(/"/g, '""')}"`
+                      )
+                      .join(",")
+                  ),
+                ].join("\n");
+                const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = `transactions-${new Date().toISOString()}.csv`;
+                link.click();
+                URL.revokeObjectURL(url);
+              } catch {
+                setError("Export failed. Check API connection.");
+              }
+            }}
+          >
+            Export CSV
+          </button>
         </div>
       </div>
       <div className="card">
@@ -269,7 +338,14 @@ export default function TransactionsClient() {
                 <td className="mono">{item.phoneNumber}</td>
                 <td>{formatMoney(item.amount)}</td>
                 <td>{item.box}</td>
-                <td>{item.status}</td>
+                <td>
+                  <span
+                    className={`status-pill status-${item.status.toLowerCase()}`}
+                  >
+                    <span className="status-dot" />
+                    {item.status}
+                  </span>
+                </td>
                 <td className="table-muted">
                   {new Date(item.createdAt).toLocaleString()}
                 </td>
