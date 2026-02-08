@@ -59,7 +59,11 @@ export class PaymentsService {
     const token = this.configService.get<string>("MPESA_ACCESS_TOKEN");
 
     if (!baseUrl || !shortcode || !callbackUrl || !passkey || !token) {
-      return { queued: true, mode: "stub" };
+      transaction.status = "FAILED";
+      transaction.resultCode = "STK_NOT_CONFIGURED";
+      transaction.resultDesc = "STK push credentials missing";
+      await this.paymentRepo.save(transaction);
+      return { queued: false, mode: "disabled" };
     }
 
     const timestamp = this.getTimestamp();
@@ -81,11 +85,23 @@ export class PaymentsService {
       TransactionDesc: "JazaBox Stake",
     };
 
-    const response = await axios.post(
-      `${baseUrl}/mpesa/stkpush/v1/processrequest`,
-      payload,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
+    let response;
+    try {
+      response = await axios.post(
+        `${baseUrl}/mpesa/stkpush/v1/processrequest`,
+        payload,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+    } catch (error: any) {
+      transaction.status = "FAILED";
+      transaction.resultCode = "STK_PUSH_FAILED";
+      transaction.resultDesc =
+        error?.response?.data?.errorMessage ||
+        error?.message ||
+        "STK push request failed";
+      await this.paymentRepo.save(transaction);
+      throw error;
+    }
 
     transaction.checkoutRequestId =
       response.data?.CheckoutRequestID ?? null;
