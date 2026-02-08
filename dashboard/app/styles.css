@@ -73,6 +73,38 @@ html {
   fill: currentColor;
 }
 
+.profile-menu {
+  position: relative;
+}
+
+.profile-dropdown {
+  position: absolute;
+  right: 0;
+  top: 52px;
+  min-width: 140px;
+  background: rgba(10, 18, 36, 0.95);
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  border-radius: 12px;
+  box-shadow: 0 14px 30px rgba(5, 10, 20, 0.45);
+  padding: 8px;
+  z-index: 10;
+}
+
+.profile-dropdown button {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  color: #e2e8f0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  text-align: left;
+  font-weight: 600;
+}
+
+.profile-dropdown button:hover {
+  background: rgba(56, 189, 248, 0.2);
+}
+
 .nav a {
   text-decoration: none;
   color: #cbd5f5;

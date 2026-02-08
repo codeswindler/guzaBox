@@ -2,20 +2,62 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const isLogin = pathname === "/login";
+  const [menuOpen, setMenuOpen] = useState(false);
+  const inactivityTimer = useRef<number | null>(null);
   const hasToken =
     typeof window !== "undefined" && Boolean(localStorage.getItem("jazabox_token"));
+
+  const logout = () => {
+    localStorage.removeItem("jazabox_token");
+    router.replace("/login");
+  };
+
+  useEffect(() => {
+    if (isLogin) return;
+    const resetTimer = () => {
+      if (inactivityTimer.current) {
+        window.clearTimeout(inactivityTimer.current);
+      }
+      inactivityTimer.current = window.setTimeout(() => {
+        logout();
+      }, 5 * 60 * 1000);
+    };
+
+    const events = ["mousemove", "mousedown", "keydown", "scroll", "touchstart"];
+    events.forEach((event) => window.addEventListener(event, resetTimer));
+    resetTimer();
+
+    return () => {
+      events.forEach((event) => window.removeEventListener(event, resetTimer));
+      if (inactivityTimer.current) {
+        window.clearTimeout(inactivityTimer.current);
+      }
+    };
+  }, [isLogin]);
 
   useEffect(() => {
     if (!isLogin && !hasToken) {
       router.replace("/login");
     }
   }, [hasToken, isLogin, router]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handleClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target?.closest(".profile-menu")) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("click", handleClick);
+    return () => document.removeEventListener("click", handleClick);
+  }, [menuOpen]);
 
   return (
     <div className={isLogin ? "app-shell login-shell" : "app-shell"}>
@@ -35,20 +77,26 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <Link href="/analytics">Analytics</Link>
             <Link href="/simulator">USSD Simulator</Link>
           </nav>
-          <button
-            className="profile-button"
-            type="button"
-            onClick={() => {
-              localStorage.removeItem("jazabox_token");
-              router.replace("/login");
-            }}
-            aria-label="Logout"
-            title="Logout"
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm0 2c-4.42 0-8 2-8 4.5V21h16v-2.5c0-2.5-3.58-4.5-8-4.5z" />
-            </svg>
-          </button>
+          <div className="profile-menu">
+            <button
+              className="profile-button"
+              type="button"
+              onClick={() => setMenuOpen((prev) => !prev)}
+              aria-label="Profile"
+              title="Profile"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm0 2c-4.42 0-8 2-8 4.5V21h16v-2.5c0-2.5-3.58-4.5-8-4.5z" />
+              </svg>
+            </button>
+            {menuOpen && (
+              <div className="profile-dropdown">
+                <button type="button" onClick={logout}>
+                  Log out
+                </button>
+              </div>
+            )}
+          </div>
         </header>
       )}
       <main className={isLogin ? "page login-page" : "page"}>{children}</main>
