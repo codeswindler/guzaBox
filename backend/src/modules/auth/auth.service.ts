@@ -84,6 +84,28 @@ export class AuthService {
     return { token };
   }
 
+  async loginWithPassword(phone: string, password: string, email?: string) {
+    const admin = await this.adminRepo.findOne({ where: { phone } });
+    if (!admin || !admin.isActive) {
+      throw new UnauthorizedException("Admin not found or inactive.");
+    }
+    if (email && admin.email && admin.email !== email) {
+      throw new UnauthorizedException("Admin email mismatch.");
+    }
+
+    const expected = this.configService.get<string>("ADMIN_PASSWORD");
+    if (!expected || password !== expected) {
+      throw new UnauthorizedException("Invalid credentials.");
+    }
+
+    const token = await this.jwtService.signAsync({
+      sub: admin.id,
+      phone: admin.phone,
+    });
+
+    return { token };
+  }
+
   private hashCode(code: string) {
     return createHash("sha256").update(code).digest("hex");
   }

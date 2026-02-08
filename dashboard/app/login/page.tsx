@@ -31,8 +31,7 @@ export default function LoginPage() {
   const router = useRouter();
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  const [code, setCode] = useState("");
-  const [stage, setStage] = useState<"request" | "verify">("request");
+  const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -41,6 +40,8 @@ export default function LoginPage() {
   const [fade, setFade] = useState(false);
 
   const images = useMemo(() => IMAGE_POOL, []);
+  const transitionMs = 3800;
+  const intervalMs = 5000;
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -58,37 +59,20 @@ export default function LoginPage() {
         setActiveIndex(nextIndex);
         setNextIndex((nextIndex + 1) % images.length);
         setFade(false);
-      }, 1600);
-    }, 12000);
+      }, transitionMs);
+    }, intervalMs);
     return () => clearInterval(interval);
-  }, [images.length, nextIndex]);
+  }, [images.length, nextIndex, transitionMs, intervalMs]);
 
-  const requestOtp = async () => {
+  const login = async () => {
     setError("");
     setMessage("");
     setLoading(true);
     try {
-      await api.post("/auth/request-otp", {
+      const res = await api.post("/auth/login", {
         phone: phone.trim(),
         email: email.trim() || undefined,
-      });
-      setStage("verify");
-      setMessage("OTP sent. Enter the code from your SMS.");
-    } catch (err: any) {
-      setError(err?.response?.data?.message || "Failed to send OTP.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const verifyOtp = async () => {
-    setError("");
-    setMessage("");
-    setLoading(true);
-    try {
-      const res = await api.post("/auth/verify-otp", {
-        phone: phone.trim(),
-        code: code.trim(),
+        password: password.trim(),
       });
       const token = res.data?.token;
       if (token) {
@@ -98,7 +82,7 @@ export default function LoginPage() {
         setError("Login failed. Please try again.");
       }
     } catch (err: any) {
-      setError(err?.response?.data?.message || "OTP verification failed.");
+      setError(err?.response?.data?.message || "Login failed.");
     } finally {
       setLoading(false);
     }
@@ -139,51 +123,28 @@ export default function LoginPage() {
             placeholder="admin@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            disabled={loading || stage === "verify"}
+            disabled={loading}
           />
 
-          {stage === "verify" && (
-            <>
-              <label>OTP Code</label>
-              <input
-                type="text"
-                placeholder="123456"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                disabled={loading}
-              />
-            </>
-          )}
+          <label>Password</label>
+          <input
+            type="password"
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={loading}
+          />
 
           {message && <p className="subtle">{message}</p>}
           {error && <p className="subtle error-text">{error}</p>}
 
           <div className="login-actions">
-            {stage === "request" ? (
-              <button onClick={requestOtp} disabled={loading || !phone.trim()}>
-                {loading ? "Sending..." : "Send OTP"}
-              </button>
-            ) : (
-              <>
-                <button
-                  onClick={verifyOtp}
-                  disabled={loading || !code.trim()}
-                >
-                  {loading ? "Verifying..." : "Verify & Sign In"}
-                </button>
-                <button
-                  className="ghost"
-                  onClick={() => {
-                    setStage("request");
-                    setCode("");
-                    setMessage("");
-                  }}
-                  disabled={loading}
-                >
-                  Resend OTP
-                </button>
-              </>
-            )}
+            <button
+              onClick={login}
+              disabled={loading || !phone.trim() || !password.trim()}
+            >
+              {loading ? "Signing in..." : "Sign In"}
+            </button>
           </div>
         </div>
       </div>

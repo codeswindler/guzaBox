@@ -1,5 +1,6 @@
 import { Body, Controller, Post } from "@nestjs/common";
 import { AuthService } from "./auth.service";
+import { PasswordLoginDto } from "./dto/password-login.dto";
 import { RequestOtpDto } from "./dto/request-otp.dto";
 import { VerifyOtpDto } from "./dto/verify-otp.dto";
 
@@ -19,5 +20,10 @@ export class AuthController {
   @Post("verify-otp")
   async verifyOtp(@Body() dto: VerifyOtpDto) {
     return this.authService.verifyOtp(dto.phone, dto.code);
+  }
+
+  @Post("login")
+  async passwordLogin(@Body() dto: PasswordLoginDto) {
+    return this.authService.loginWithPassword(dto.phone, dto.password, dto.email);
   }
 }
