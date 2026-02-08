@@ -11,6 +11,7 @@ export class UssdController {
     if (!cleanedInput) return "";
     const inputParts = cleanedInput.split("*").filter(Boolean);
     if (!ussdCode) {
+      if (inputParts.length <= 1) return "";
       return inputParts[inputParts.length - 1] ?? "";
     }
     const cleanedCode = ussdCode
@@ -24,6 +25,7 @@ export class UssdController {
     const remaining = startsWithCode
       ? inputParts.slice(codeParts.length)
       : inputParts;
+    if (remaining.length === 0) return "";
     return remaining[remaining.length - 1] ?? "";
   }
 
