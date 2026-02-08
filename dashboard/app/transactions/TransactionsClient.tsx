@@ -36,6 +36,7 @@ export default function TransactionsClient() {
   const lastSeenRef = useRef<string | null>(null);
   const envMock = process.env.NEXT_PUBLIC_MOCK_DATA === "true";
   const [mockEnabled, setMockEnabled] = useState(envMock);
+  const [error, setError] = useState("");
 
   const buildMockTx = (): Transaction => {
     const amount = Math.floor(20 + Math.random() * 15);
@@ -98,6 +99,7 @@ export default function TransactionsClient() {
       return;
     }
     try {
+      setError("");
       const [txRes, kpiRes] = await Promise.all([
         api.get("/payments/transactions", {
           params: status ? { status } : undefined,
@@ -128,10 +130,7 @@ export default function TransactionsClient() {
       setItems(data);
       setKpis(kpiRes.data);
     } catch (error) {
-      setMockEnabled(true);
-      const seed = Array.from({ length: 8 }, buildMockTx);
-      setItems(seed);
-      setKpis(buildMockKpis());
+      setError("Live transactions unavailable. Check API connection.");
     }
   };
 
@@ -191,6 +190,7 @@ export default function TransactionsClient() {
         Review incoming payments and statuses.
         {mockEnabled && " (mock data)"}
       </p>
+      {error && <p className="subtle">{error}</p>}
       <div className="card demo-card kpi-card">
         <div className="kpi-tabs">
           <button

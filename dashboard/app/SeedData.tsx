@@ -4,6 +4,10 @@ import { useEffect } from "react";
 import api from "../lib/api";
 
 export default function SeedData() {
+  if (process.env.NEXT_PUBLIC_MOCK_DATA !== "true") {
+    return null;
+  }
+
   useEffect(() => {
     const seed = async () => {
       try {
