@@ -40,6 +40,16 @@ export default function TransactionsClient() {
   const [mockEnabled, setMockEnabled] = useState(envMock);
   const [error, setError] = useState("");
 
+  const toSqlDateTime = (value: string) => {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+      date.getDate()
+    )} ${pad(date.getHours())}:${pad(date.getMinutes())}:00`;
+  };
+
   const buildMockTx = (): Transaction => {
     const amount = Math.floor(20 + Math.random() * 15);
     const phoneSuffix = Math.floor(100000 + Math.random() * 899999);
@@ -104,8 +114,10 @@ export default function TransactionsClient() {
       setError("");
       const params: Record<string, string> = {};
       if (status) params.status = status;
-      if (from) params.from = new Date(from).toISOString();
-      if (to) params.to = new Date(to).toISOString();
+      const fromValue = toSqlDateTime(from);
+      const toValue = toSqlDateTime(to);
+      if (fromValue) params.from = fromValue;
+      if (toValue) params.to = toValue;
       const [txRes, kpiRes] = await Promise.all([
         api.get("/payments/transactions", { params }),
         api.get("/payments/kpis"),
@@ -265,13 +277,28 @@ export default function TransactionsClient() {
           />
           <button onClick={load}>Refresh</button>
           <button
+            onClick={() => {
+              setStatus("");
+              setFrom("");
+              setTo("");
+            }}
+          >
+            Clear Filters
+          </button>
+          <span className="subtle">
+            Found {visibleItems.length} record
+            {visibleItems.length === 1 ? "" : "s"}
+          </span>
+          <button
             onClick={async () => {
               try {
                 setError("");
                 const exportParams: Record<string, string> = {};
                 if (status) exportParams.status = status;
-                if (from) exportParams.from = new Date(from).toISOString();
-                if (to) exportParams.to = new Date(to).toISOString();
+                const exportFrom = toSqlDateTime(from);
+                const exportTo = toSqlDateTime(to);
+                if (exportFrom) exportParams.from = exportFrom;
+                if (exportTo) exportParams.to = exportTo;
                 const res = await api.get("/payments/transactions", {
                   params: exportParams,
                 });
