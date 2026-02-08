@@ -43,6 +43,15 @@ export default function LoginPage() {
   const images = useMemo(() => IMAGE_POOL, []);
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("jazabox_token");
+      if (token) {
+        router.replace("/");
+      }
+    }
+  }, [router]);
+
+  useEffect(() => {
     const interval = setInterval(() => {
       setFade(true);
       setTimeout(() => {

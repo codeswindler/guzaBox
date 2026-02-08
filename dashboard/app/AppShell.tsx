@@ -1,11 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const isLogin = pathname === "/login";
+  const hasToken =
+    typeof window !== "undefined" && Boolean(localStorage.getItem("jazabox_token"));
+
+  useEffect(() => {
+    if (!isLogin && !hasToken) {
+      router.replace("/login");
+    }
+  }, [hasToken, isLogin, router]);
 
   return (
     <div className={isLogin ? "app-shell login-shell" : "app-shell"}>
