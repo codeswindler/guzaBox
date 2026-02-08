@@ -1,8 +1,10 @@
-import { Body, Controller, Get, Post, Query } from "@nestjs/common";
+import { Body, Controller, Get, Logger, Post, Query } from "@nestjs/common";
 import { UssdService } from "./ussd.service";
 
 @Controller("ussd")
 export class UssdController {
+  private readonly logger = new Logger(UssdController.name);
+
   constructor(private readonly ussdService: UssdService) {}
 
   private normalizeInput(input?: string, ussdCode?: string) {
@@ -26,6 +28,7 @@ export class UssdController {
       ? inputParts.slice(codeParts.length)
       : inputParts;
     if (remaining.length === 0) return "";
+    if (!startsWithCode && remaining.length === 1) return "";
     return remaining[remaining.length - 1] ?? "";
   }
 
@@ -51,11 +54,32 @@ export class UssdController {
       query.USSDCODE ?? query.ussdCode
     );
 
-    return this.ussdService.handleRequest(
+    this.logger.log(
+      JSON.stringify({
+        event: "ussd_request",
+        method: "GET",
+        sessionId,
+        phoneNumber,
+        ussdCode: query.USSDCODE ?? query.ussdCode ?? null,
+        inputRaw,
+        inputNormalized: normalizedInput,
+      })
+    );
+
+    const response = await this.ussdService.handleRequest(
       sessionId,
       phoneNumber,
       normalizedInput
     );
+    this.logger.log(
+      JSON.stringify({
+        event: "ussd_response",
+        method: "GET",
+        sessionId,
+        responsePreview: response.split("\n").slice(0, 3).join(" | "),
+      })
+    );
+    return response;
   }
 
   @Post()
@@ -75,12 +99,31 @@ export class UssdController {
     const phoneNumber = body.phoneNumber ?? body.MSISDN ?? "";
     const inputRaw = body.text ?? body.INPUT ?? "";
     const normalizedInput = this.normalizeInput(inputRaw, body.USSDCODE);
+    this.logger.log(
+      JSON.stringify({
+        event: "ussd_request",
+        method: "POST",
+        sessionId,
+        phoneNumber,
+        ussdCode: body.USSDCODE ?? null,
+        inputRaw,
+        inputNormalized: normalizedInput,
+      })
+    );
+
     const response = await this.ussdService.handleRequest(
       sessionId,
       phoneNumber,
       normalizedInput
     );
-
+    this.logger.log(
+      JSON.stringify({
+        event: "ussd_response",
+        method: "POST",
+        sessionId,
+        responsePreview: response.split("\n").slice(0, 3).join(" | "),
+      })
+    );
     return response;
   }
 
