@@ -84,19 +84,12 @@ export class AuthService {
     return { token };
   }
 
-  async loginWithPassword(
-    identifier: string,
-    password: string,
-    email?: string
-  ) {
+  async loginWithPassword(identifier: string, password: string) {
     const admin = await this.adminRepo.findOne({
       where: [{ phone: identifier }, { email: identifier }],
     });
     if (!admin || !admin.isActive) {
       throw new UnauthorizedException("Admin not found or inactive.");
-    }
-    if (email && admin.email && admin.email !== email) {
-      throw new UnauthorizedException("Admin email mismatch.");
     }
 
     const expected = this.configService.get<string>("ADMIN_PASSWORD");

@@ -30,7 +30,6 @@ const IMAGE_POOL = [
 export default function LoginPage() {
   const router = useRouter();
   const [identifier, setIdentifier] = useState("");
-  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -71,7 +70,6 @@ export default function LoginPage() {
     try {
       const res = await api.post("/auth/login", {
         identifier: identifier.trim(),
-        email: email.trim() || undefined,
         password: password.trim(),
       });
       const token = res.data?.token;
@@ -117,15 +115,6 @@ export default function LoginPage() {
             onChange={(e) => setIdentifier(e.target.value)}
             disabled={loading}
           />
-          <label>Email (optional)</label>
-          <input
-            type="email"
-            placeholder="admin@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            disabled={loading}
-          />
-
           <label>Password</label>
           <input
             type="password"
