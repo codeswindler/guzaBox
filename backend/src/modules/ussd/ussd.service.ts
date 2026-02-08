@@ -59,9 +59,14 @@ export class UssdService {
       session.transactionId = transaction.id;
       await this.sessionRepo.save(session);
 
-      await this.paymentsService.initiateStkPush(transaction);
-
-      return "END Complete the transaction to get your winning status";
+      try {
+        await this.paymentsService.initiateStkPush(transaction);
+        return "END Complete the transaction to get your winning status";
+      } catch {
+        session.state = "FAILED";
+        await this.sessionRepo.save(session);
+        return "END Payment request failed. Please try again later.";
+      }
     }
 
     return "END Session in progress. Please wait.";
