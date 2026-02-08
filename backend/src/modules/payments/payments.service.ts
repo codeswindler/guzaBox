@@ -13,6 +13,27 @@ export class PaymentsService {
     private readonly configService: ConfigService
   ) {}
 
+  async markStalePendingTransactions() {
+    const timeoutMinutes = Number(
+      this.configService.get<string>("PAYMENT_TIMEOUT_MINUTES") || 15
+    );
+    if (!Number.isFinite(timeoutMinutes) || timeoutMinutes <= 0) {
+      return;
+    }
+    const cutoff = new Date(Date.now() - timeoutMinutes * 60 * 1000);
+    await this.paymentRepo
+      .createQueryBuilder()
+      .update(PaymentTransaction)
+      .set({
+        status: "FAILED",
+        resultCode: "TIMEOUT",
+        resultDesc: "Payment request timed out",
+      })
+      .where("status = :status", { status: "PENDING" })
+      .andWhere("createdAt < :cutoff", { cutoff })
+      .execute();
+  }
+
   pickStakeAmount(min: number, max: number) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
   }

@@ -23,6 +23,7 @@ export class PaymentsController {
     @Query("from") from?: string,
     @Query("to") to?: string
   ) {
+    await this.paymentsService.markStalePendingTransactions();
     const qb = this.paymentRepo.createQueryBuilder("tx").orderBy("tx.createdAt", "DESC");
 
     if (status) {
