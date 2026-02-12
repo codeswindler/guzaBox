@@ -16,7 +16,7 @@ Chagua Box yako ya Ushindi
 6. Box 6`;
 
 @Injectable()
-export class UssdService {
+export class UssdNewService {
   constructor(
     @InjectRepository(UssdSession)
     private readonly sessionRepo: Repository<UssdSession>,
@@ -86,7 +86,7 @@ export class UssdService {
     }
 
     // Get transaction status
-    const transaction = await this.paymentsService.getTransaction(session.transactionId);
+    const transaction = await null;
     if (!transaction) {
       return "END Transaction not found. Please contact support.";
     }

@@ -7,31 +7,6 @@ export class UssdController {
 
   constructor(private readonly ussdService: UssdService) {}
 
-  private normalizeInput(input?: string, ussdCode?: string) {
-    if (!input) return "";
-    const cleanedInput = input.trim().replace(/^(\*+)/, "").replace(/#$/, "");
-    if (!cleanedInput) return "";
-    const inputParts = cleanedInput.split("*").filter(Boolean);
-    if (!ussdCode) {
-      if (inputParts.length <= 1) return "";
-      return inputParts[inputParts.length - 1] ?? "";
-    }
-    const cleanedCode = ussdCode
-      .trim()
-      .replace(/^(\*+)/, "")
-      .replace(/#$/, "");
-    const codeParts = cleanedCode ? cleanedCode.split("*").filter(Boolean) : [];
-    const startsWithCode =
-      codeParts.length > 0 &&
-      inputParts.slice(0, codeParts.length).join("*") === codeParts.join("*");
-    const remaining = startsWithCode
-      ? inputParts.slice(codeParts.length)
-      : inputParts;
-    if (remaining.length === 0) return "";
-    if (!startsWithCode && remaining.length === 1) return "";
-    return remaining[remaining.length - 1] ?? "";
-  }
-
   @Get()
   async handleUssdGet(
     @Query()
@@ -71,6 +46,7 @@ export class UssdController {
       phoneNumber,
       normalizedInput
     );
+    
     this.logger.log(
       JSON.stringify({
         event: "ussd_response",
@@ -79,6 +55,7 @@ export class UssdController {
         responsePreview: response.split("\n").slice(0, 3).join(" | "),
       })
     );
+
     return response;
   }
 
@@ -99,6 +76,7 @@ export class UssdController {
     const phoneNumber = body.phoneNumber ?? body.MSISDN ?? "";
     const inputRaw = body.text ?? body.INPUT ?? "";
     const normalizedInput = this.normalizeInput(inputRaw, body.USSDCODE);
+    
     this.logger.log(
       JSON.stringify({
         event: "ussd_request",
@@ -116,6 +94,7 @@ export class UssdController {
       phoneNumber,
       normalizedInput
     );
+    
     this.logger.log(
       JSON.stringify({
         event: "ussd_response",
@@ -124,20 +103,30 @@ export class UssdController {
         responsePreview: response.split("\n").slice(0, 3).join(" | "),
       })
     );
+
     return response;
   }
 
-  @Post("simulate")
-  async simulateUssd(
-    @Body()
-    body: { sessionId: string; phoneNumber: string; text?: string }
-  ) {
-    const response = await this.ussdService.handleRequest(
-      body.sessionId,
-      body.phoneNumber,
-      body.text ?? ""
-    );
-
-    return { response };
+  private normalizeInput(input?: string, ussdCode?: string) {
+    if (!input) return "";
+    
+    // Handle USSD code input (like *519# or *519*63#)
+    if (input.includes("*") || input.includes("#")) {
+      const cleanedCode = ussdCode?.replace("*", "").replace("#", "") || "";
+      const cleanedInput = input.replace("*", "").replace("#", "");
+      
+      if (cleanedInput.includes(cleanedCode)) {
+        return ""; // Return empty to show menu
+      }
+    }
+    
+    // Normalize multi-step input (63*1*1 -> 1)
+    let normalizedInput = input.trim();
+    if (normalizedInput.includes("*")) {
+      const parts = normalizedInput.split("*");
+      normalizedInput = parts[parts.length - 1]; // Take last part
+    }
+    
+    return normalizedInput;
   }
 }

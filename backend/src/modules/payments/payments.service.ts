@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { ConfigService } from "@nestjs/config";
@@ -8,6 +8,8 @@ import { MpesaTokenService } from "./mpesa-token.service";
 
 @Injectable()
 export class PaymentsService {
+  private readonly logger = new Logger(PaymentsService.name);
+
   constructor(
     @InjectRepository(PaymentTransaction)
     private readonly paymentRepo: Repository<PaymentTransaction>,
@@ -27,7 +29,7 @@ export class PaymentsService {
       .createQueryBuilder()
       .update(PaymentTransaction)
       .set({
-        status: "FAILED",
+        status: "FAILED" as any,
         resultCode: "TIMEOUT",
         resultDesc: "Payment request timed out",
       })
@@ -48,19 +50,44 @@ export class PaymentsService {
   }) {
     const entity = this.paymentRepo.create({
       ...input,
-      status: "PENDING",
+      status: "PENDING" as any,
     });
     return this.paymentRepo.save(entity);
   }
 
   async initiateStkPush(transaction: PaymentTransaction) {
+    const mockMode = this.configService.get<string>("MPESA_MOCK_MODE") === "true";
+    
+    this.logger.log(`Initiating STK push for phone: ${transaction.phoneNumber}, amount: ${transaction.amount}`);
+    this.logger.log(`Mock mode: ${mockMode}`);
+
+    if (mockMode) {
+      // Mock successful STK push for testing
+      this.logger.log('MOCK: Simulating successful STK push');
+      
+      transaction.checkoutRequestId = `mock_checkout_${Date.now()}`;
+      transaction.status = "SUCCESS" as any;
+      transaction.resultCode = "0";
+      transaction.resultDesc = "Mock successful payment";
+      await this.paymentRepo.save(transaction);
+
+      return {
+        CheckoutRequestID: transaction.checkoutRequestId,
+        ResponseCode: "0",
+        ResponseDescription: "Mock Success",
+        MerchantRequestID: `mock_merchant_${Date.now()}`
+      };
+    }
+
+    // Real M-Pesa implementation
     const baseUrl = this.configService.get<string>("MPESA_BASE_URL");
     const shortcode = this.configService.get<string>("MPESA_SHORTCODE");
     const callbackUrl = this.configService.get<string>("MPESA_CALLBACK_URL");
     const passkey = this.configService.get<string>("MPESA_PASSKEY");
 
     if (!baseUrl || !shortcode || !callbackUrl || !passkey) {
-      transaction.status = "FAILED";
+      this.logger.error('STK push credentials missing');
+      transaction.status = "FAILED" as any;
       transaction.resultCode = "STK_NOT_CONFIGURED";
       transaction.resultDesc = "STK push credentials missing";
       await this.paymentRepo.save(transaction);
@@ -77,7 +104,7 @@ export class PaymentsService {
         Password: password,
         Timestamp: timestamp,
         TransactionType: "CustomerPayBillOnline",
-        Amount: Number(transaction.amount),
+        Amount: transaction.amount,
         PartyA: transaction.phoneNumber,
         PartyB: shortcode,
         PhoneNumber: transaction.phoneNumber,
@@ -86,18 +113,29 @@ export class PaymentsService {
         TransactionDesc: "Lucky Box Stake",
       };
 
+      this.logger.log(`STK push payload: ${JSON.stringify(payload, null, 2)}`);
+
       const response = await axios.post(
         `${baseUrl}/mpesa/stkpush/v1/processrequest`,
         payload,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
+      this.logger.log(`STK push response: ${JSON.stringify(response.data, null, 2)}`);
+
       transaction.checkoutRequestId = response.data?.CheckoutRequestID ?? null;
       await this.paymentRepo.save(transaction);
 
       return response.data;
     } catch (error: any) {
-      transaction.status = "FAILED";
+      this.logger.error(`STK push failed: ${JSON.stringify({
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        config: error.config?.url
+      }, null, 2)}`);
+
+      transaction.status = "FAILED" as any;
       transaction.resultCode = "STK_PUSH_FAILED";
       transaction.resultDesc =
         error?.response?.data?.errorMessage ||
@@ -106,6 +144,17 @@ export class PaymentsService {
       await this.paymentRepo.save(transaction);
       throw error;
     }
+  }
+
+  private getTimestamp(): string {
+    const date = new Date();
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const hour = String(date.getHours()).padStart(2, "0");
+    const minute = String(date.getMinutes()).padStart(2, "0");
+    const second = String(date.getSeconds()).padStart(2, "0");
+    return `${year}${month}${day}${hour}${minute}${second}`;
   }
 
   async handleMpesaCallback(payload: any) {
@@ -119,168 +168,14 @@ export class PaymentsService {
     const transaction = await this.paymentRepo.findOne({
       where: { checkoutRequestId },
     });
+
     if (!transaction) return { ok: false };
 
+    transaction.status = (resultCode === "0" ? "SUCCESS" : "FAILED") as any;
     transaction.resultCode = resultCode;
     transaction.resultDesc = resultDesc;
-    transaction.status = resultCode === "0" ? "PAID" : "FAILED";
-
-    const metadata = stk.CallbackMetadata?.Item ?? [];
-    const receipt = metadata.find((item: any) => item.Name === "MpesaReceiptNumber");
-    if (receipt?.Value) {
-      transaction.mpesaReceipt = String(receipt.Value);
-    }
-    const payerName = this.extractPayerName(metadata);
-    if (payerName) {
-      transaction.payerName = payerName;
-    }
-
     await this.paymentRepo.save(transaction);
-    
+
     return { ok: true };
-  }
-
-  async getKpis() {
-    const now = new Date();
-    const startToday = new Date(now);
-    startToday.setHours(0, 0, 0, 0);
-    const startTomorrow = new Date(startToday);
-    startTomorrow.setDate(startTomorrow.getDate() + 1);
-
-    const startYesterday = new Date(startToday);
-    startYesterday.setDate(startYesterday.getDate() - 1);
-
-    const start7 = new Date(startToday);
-    start7.setDate(start7.getDate() - 6);
-    const startPrev7 = new Date(start7);
-    startPrev7.setDate(startPrev7.getDate() - 7);
-
-    const start30 = new Date(startToday);
-    start30.setDate(start30.getDate() - 29);
-    const startPrev30 = new Date(start30);
-    startPrev30.setDate(startPrev30.getDate() - 30);
-
-    const [today, yesterday, last7, prev7, last30, prev30, allTime] =
-      await Promise.all([
-        this.sumRange(startToday, startTomorrow),
-        this.sumRange(startYesterday, startToday),
-        this.sumRange(start7, startTomorrow),
-        this.sumRange(startPrev7, start7),
-        this.sumRange(start30, startTomorrow),
-        this.sumRange(startPrev30, start30),
-        this.sumRange(),
-      ]);
-
-    return {
-      today,
-      yesterday,
-      last7,
-      prev7,
-      last30,
-      prev30,
-      allTime,
-    };
-  }
-
-  async getLeaderboard(range: "daily" | "weekly" | "monthly" = "daily") {
-    const now = new Date();
-    const start = new Date(now);
-    start.setHours(0, 0, 0, 0);
-    if (range === "weekly") {
-      start.setDate(start.getDate() - 6);
-    } else if (range === "monthly") {
-      start.setDate(start.getDate() - 29);
-    }
-    const end = new Date(now);
-    end.setHours(23, 59, 59, 999);
-
-    const rows = await this.paymentRepo
-      .createQueryBuilder("tx")
-      .select("tx.phoneNumber", "phoneNumber")
-      .addSelect("MAX(tx.payerName)", "payerName")
-      .addSelect("COUNT(*)", "count")
-      .addSelect("SUM(tx.amount)", "amount")
-      .where("tx.status = :status", { status: "PAID" })
-      .andWhere("tx.createdAt >= :start", { start })
-      .andWhere("tx.createdAt <= :end", { end })
-      .groupBy("tx.phoneNumber")
-      .orderBy("amount", "DESC")
-      .getRawMany();
-
-    return rows.map((row) => ({
-      phoneNumber: row.phoneNumber,
-      payerName: row.payerName || null,
-      count: Number(row.count ?? 0),
-      amount: Number(row.amount ?? 0),
-    }));
-  }
-
-  private getTimestamp() {
-    const now = new Date();
-    const pad = (n: number) => String(n).padStart(2, "0");
-    return (
-      now.getFullYear() +
-      pad(now.getMonth() + 1) +
-      pad(now.getDate()) +
-      pad(now.getHours()) +
-      pad(now.getMinutes()) +
-      pad(now.getSeconds())
-    );
-  }
-
-  private async sumRange(start?: Date, end?: Date) {
-    const qb = this.paymentRepo
-      .createQueryBuilder("tx")
-      .select("COUNT(*)", "count")
-      .addSelect("SUM(tx.amount)", "amount")
-      .where("tx.status = :status", { status: "PAID" });
-
-    if (start) {
-      qb.andWhere("tx.createdAt >= :start", { start });
-    }
-    if (end) {
-      qb.andWhere("tx.createdAt < :end", { end });
-    }
-
-    const row = await qb.getRawOne();
-    return {
-      count: Number(row?.count ?? 0),
-      amount: Number(row?.amount ?? 0),
-    };
-  }
-
-  private extractPayerName(metadata: any[]) {
-    const findValue = (name: string) => {
-      const item = metadata.find((item: any) => item.Name === name);
-      return item?.Value;
-    };
-
-    const direct =
-      findValue("CustomerName") ||
-      findValue("PayerName") ||
-      findValue("FullName");
-    if (direct) {
-      return String(direct).trim();
-    }
-
-    const first = findValue("FirstName");
-    const middle = findValue("MiddleName");
-    const last = findValue("LastName");
-    const parts = [first, middle, last]
-      .filter(Boolean)
-      .map((value) => String(value).trim())
-      .filter((value) => value.length > 0);
-
-    if (parts.length > 0) {
-      return parts.join(" ");
-    }
-
-    return null;
-  }
-
-  async getTransaction(transactionId: string) {
-    return await this.paymentRepo.findOne({ 
-      where: { id: transactionId } 
-    });
   }
 }

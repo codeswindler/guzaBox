@@ -25,9 +25,9 @@ import { Player } from "./modules/player/entities/player.entity";
         type: "mariadb",
         host: config.get<string>("DB_HOST", "localhost"),
         port: config.get<number>("DB_PORT", 3306),
-        username: config.get<string>("DB_USER", "guzabox"),
-        password: config.get<string>("DB_PASSWORD", "pass"),
-        database: config.get<string>("DB_NAME", "jazabox"),
+        username: config.get<string>("DB_USERNAME", "luckyuser"),
+        password: config.get<string>("DB_PASSWORD", "willrocks"),
+        database: config.get<string>("DB_NAME", "luckybox"),
         entities: [
           AdminUser,
           OtpCode,

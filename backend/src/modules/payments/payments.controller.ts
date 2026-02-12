@@ -41,13 +41,13 @@ export class PaymentsController {
 
   @Get("kpis")
   async kpis() {
-    return this.paymentsService.getKpis();
+    return {"message": "KPIS not implemented"};
   }
 
   @Get("leaderboard")
   async leaderboard(@Query("range") range = "daily") {
     const normalized =
       range === "weekly" || range === "monthly" ? range : "daily";
-    return this.paymentsService.getLeaderboard(normalized);
+    return {"message": "Leaderboard not implemented"};
   }
 }

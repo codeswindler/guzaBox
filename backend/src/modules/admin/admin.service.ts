@@ -68,7 +68,6 @@ export class AdminService {
       "James Kariuki",
       "Amina Ali",
       "Peter Maina",
-      "Faith Wambui",
       "Brian Otieno",
       "Mercy Njeri",
     ];
