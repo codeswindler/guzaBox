@@ -23,6 +23,7 @@ type Release = {
 export default function OverviewClient() {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [releases, setReleases] = useState<Release[]>([]);
+  const [instantWinStatus, setInstantWinStatus] = useState<any>(null);
   const [error, setError] = useState("");
 
   const formatMoney = (value: number) =>
@@ -35,12 +36,14 @@ export default function OverviewClient() {
   const load = async () => {
     try {
       setError("");
-      const [overviewRes, releasesRes] = await Promise.all([
+      const [overviewRes, releasesRes, instantWinRes] = await Promise.all([
         api.get("/analytics/overview"),
         api.get("/payouts/releases"),
+        api.get("/admin/instant-win/status"),
       ]);
       setOverview(overviewRes.data);
       setReleases(releasesRes.data ?? []);
+      setInstantWinStatus(instantWinRes.data);
     } catch (err: any) {
       setError("Live overview unavailable. Ensure API access and seed data.");
     }
@@ -83,6 +86,22 @@ export default function OverviewClient() {
             {overview ? totalWinners : "--"}
           </div>
         </div>
+        {instantWinStatus && (
+          <div className="card demo-card">
+            <div className="subtle">Instant Wins</div>
+            <div className="mono" style={{ 
+              color: instantWinStatus.enabled ? '#10b981' : '#ef4444',
+              fontSize: '1.5rem'
+            }}>
+              {instantWinStatus.enabled ? "ON" : "OFF"}
+            </div>
+            <div className="subtle">
+              {instantWinStatus.enabled 
+                ? `${(instantWinStatus.settings.baseProbability * 100).toFixed(1)}% chance` 
+                : "Disabled"}
+            </div>
+          </div>
+        )}
       </div>
       <div className="card demo-card">
         <h3>Quick Actions</h3>

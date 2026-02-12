@@ -4,7 +4,7 @@ import { Repository } from "typeorm";
 import { UssdSession } from "./entities/ussd-session.entity";
 import { PaymentsService } from "../payments/payments.service";
 
-const MENU_TEXT = `JazaBox
+const MENU_TEXT = `Lucky Box
 Stake Between Ksh. 20 and 30
 Chagua Box yako ya Ushindi
 1. Box 1

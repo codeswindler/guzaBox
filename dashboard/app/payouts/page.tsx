@@ -216,64 +216,45 @@ export default function PayoutsPage() {
     <div>
       <h2 className="page-title">Payouts</h2>
       <p className="subtle">
-        Release today’s winners within your configured budget.
+        <strong>Instant Gratification System Active</strong> - Manual releases disabled.
+        <br />
+        Use <strong>Instant Wins</strong> page for real-time control.
       </p>
       {error && <p className="subtle">{error}</p>}
 
-      <div className="stat-grid">
-        <div className="card demo-card">
-          <p className="kpi-label">Collected Today</p>
-          <p className="kpi-value">
-            {formatMoney(kpis?.today.amount ?? 0)}
-          </p>
-          <p className="subtle">{kpis?.today.count ?? 0} payments</p>
-        </div>
-        <div className="card demo-card">
-          <p className="kpi-label">Collected Since Last Release</p>
-          <p className="kpi-value">{formatMoney(sinceRelease.amount)}</p>
-          <p className="subtle">
-            {sinceRelease.count} payments
-            {sinceRelease.isFirstRelease ? " • First release" : ""}
-          </p>
-        </div>
-        <div className="card demo-card">
-          <p className="kpi-label">Release Budget</p>
-          <p className="kpi-value">{formatMoney(releaseBudget)}</p>
-          <p className="subtle">Based on today’s collection</p>
-        </div>
-      </div>
-
-      <div className="card demo-card payout-controls">
-        <div className="input-row">
-          <label>Release Budget</label>
-          <input
-            type="number"
-            value={releaseBudget}
-            onChange={(e) => setReleaseBudget(Number(e.target.value))}
-          />
-        </div>
-        <div className="input-row">
-          <label>Min Win</label>
-          <input
-            type="number"
-            value={minWin}
-            onChange={(e) => setMinWin(Number(e.target.value))}
-          />
-        </div>
-        <div className="input-row">
-          <label>Max Win</label>
-          <input
-            type="number"
-            value={maxWin}
-            onChange={(e) => setMaxWin(Number(e.target.value))}
-          />
-        </div>
-        <button onClick={openPreview}>Preview Release</button>
-        {message && <p className="subtle">{message}</p>}
+      <div className="card demo-card" style={{ 
+        backgroundColor: '#fef3c7', 
+        border: '1px solid #f59e0b',
+        padding: '20px',
+        textAlign: 'center'
+      }}>
+        <h3 style={{ color: '#92400e', marginBottom: '10px' }}>
+          🎯 Instant Gratification Mode
+        </h3>
+        <p style={{ color: '#78350f', marginBottom: '15px' }}>
+          All wins are processed instantly. Manual release system has been retired.
+        </p>
+        <a 
+          href="/instant-win" 
+          style={{
+            display: 'inline-block',
+            backgroundColor: '#10b981',
+            color: 'white',
+            padding: '12px 24px',
+            textDecoration: 'none',
+            borderRadius: '8px',
+            fontWeight: 'bold'
+          }}
+        >
+          Go to Instant Wins Control →
+        </a>
       </div>
 
       <div className="card demo-card">
-        <h3>Release History</h3>
+        <h3>Historical Release Data</h3>
+        <p className="subtle">
+          Previous manual releases (archived for reference only)
+        </p>
         <table>
           <thead>
             <tr>
@@ -333,122 +314,6 @@ export default function PayoutsPage() {
           </tbody>
         </table>
       </div>
-
-      {modalOpen && preview && (
-        <div className="modal-overlay">
-          <div className="modal-card">
-            <div className="modal-header">
-              <div>
-                <h3>Release Preview</h3>
-                <p className="subtle">
-                  Review the budget split before confirming.
-                </p>
-              </div>
-              <button onClick={() => setModalOpen(false)}>Close</button>
-            </div>
-            <div className="receipt">
-              <div>
-                <p className="kpi-label">Today Collected</p>
-                <p className="kpi-value">
-                  {formatMoney(preview.totals.collectedToday)}
-                </p>
-                <p className="subtle">
-                  {preview.totals.collectedCount} payments
-                </p>
-              </div>
-              <div>
-                <p className="kpi-label">Budget</p>
-                <p className="kpi-value">{formatMoney(preview.budget)}</p>
-                <p className="subtle">
-                  {formatPercent(preview.totals.percentage)} of today
-                </p>
-              </div>
-              <div>
-                <p className="kpi-label">Total Release</p>
-                <p className="kpi-value">
-                  {formatMoney(preview.totals.totalReleased)}
-                </p>
-                <p className="subtle">
-                  Remaining {formatMoney(preview.totals.remainingBudget)}
-                </p>
-              </div>
-            </div>
-
-            <div className="preview-grid">
-              <div className="card">
-                <h4>Ranked Players</h4>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Player</th>
-                      <th>Total Paid</th>
-                      <th>Count</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {preview.leaderboard.map((player) => (
-                      <tr key={player.phoneNumber}>
-                        <td>
-                          {player.payerName || "—"}{" "}
-                          <span className="table-muted">
-                            ({player.phoneNumber})
-                          </span>
-                        </td>
-                        <td>{formatMoney(player.totalPaid)}</td>
-                        <td>{player.count}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div className="card">
-                <h4>Proposed Winners</h4>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Player</th>
-                      <th>Total Paid</th>
-                      <th>Win Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {preview.winners.map((winner) => (
-                      <tr key={winner.phoneNumber}>
-                        <td>
-                          {winner.payerName || "—"}{" "}
-                          <span className="table-muted">
-                            ({winner.phoneNumber})
-                          </span>
-                        </td>
-                        <td>{formatMoney(winner.totalPaid)}</td>
-                        <td>
-                          <input
-                            type="number"
-                            value={winner.amount}
-                            onChange={(e) =>
-                              updateWinnerAmount(
-                                winner.phoneNumber,
-                                Number(e.target.value)
-                              )
-                            }
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div className="modal-footer">
-              <span className="subtle">
-                Total release: {formatMoney(totalOverride)}
-              </span>
-              <button onClick={confirmRelease}>Confirm Release</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

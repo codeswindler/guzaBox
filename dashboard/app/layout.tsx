@@ -4,8 +4,13 @@ import SeedData from "./SeedData";
 import AppShell from "./AppShell";
 
 export const metadata = {
-  title: "JazaBox Admin",
+  title: "Lucky Box Admin",
   description: "Admin dashboard",
+  icons: {
+    icon: '/favicon.ico',
+    shortcut: '/favicon-16x16.png',
+    apple: '/favicon.ico',
+  },
 };
 
 export default function RootLayout({

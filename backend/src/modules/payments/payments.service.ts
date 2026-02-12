@@ -4,13 +4,15 @@ import { Repository } from "typeorm";
 import { ConfigService } from "@nestjs/config";
 import axios from "axios";
 import { PaymentTransaction } from "./entities/payment-transaction.entity";
+import { MpesaTokenService } from "./mpesa-token.service";
 
 @Injectable()
 export class PaymentsService {
   constructor(
     @InjectRepository(PaymentTransaction)
     private readonly paymentRepo: Repository<PaymentTransaction>,
-    private readonly configService: ConfigService
+    private readonly configService: ConfigService,
+    private readonly mpesaTokenService: MpesaTokenService,
   ) {}
 
   async markStalePendingTransactions() {
@@ -56,9 +58,8 @@ export class PaymentsService {
     const shortcode = this.configService.get<string>("MPESA_SHORTCODE");
     const callbackUrl = this.configService.get<string>("MPESA_CALLBACK_URL");
     const passkey = this.configService.get<string>("MPESA_PASSKEY");
-    const token = this.configService.get<string>("MPESA_ACCESS_TOKEN");
 
-    if (!baseUrl || !shortcode || !callbackUrl || !passkey || !token) {
+    if (!baseUrl || !shortcode || !callbackUrl || !passkey) {
       transaction.status = "FAILED";
       transaction.resultCode = "STK_NOT_CONFIGURED";
       transaction.resultDesc = "STK push credentials missing";
@@ -66,32 +67,35 @@ export class PaymentsService {
       return { queued: false, mode: "disabled" };
     }
 
-    const timestamp = this.getTimestamp();
-    const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString(
-      "base64"
-    );
-
-    const payload = {
-      BusinessShortCode: shortcode,
-      Password: password,
-      Timestamp: timestamp,
-      TransactionType: "CustomerPayBillOnline",
-      Amount: Number(transaction.amount),
-      PartyA: transaction.phoneNumber,
-      PartyB: shortcode,
-      PhoneNumber: transaction.phoneNumber,
-      CallBackURL: callbackUrl,
-      AccountReference: transaction.id,
-      TransactionDesc: "JazaBox Stake",
-    };
-
-    let response;
     try {
-      response = await axios.post(
+      const token = await this.mpesaTokenService.getAccessToken();
+      const timestamp = this.getTimestamp();
+      const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString("base64");
+
+      const payload = {
+        BusinessShortCode: shortcode,
+        Password: password,
+        Timestamp: timestamp,
+        TransactionType: "CustomerPayBillOnline",
+        Amount: Number(transaction.amount),
+        PartyA: transaction.phoneNumber,
+        PartyB: shortcode,
+        PhoneNumber: transaction.phoneNumber,
+        CallBackURL: callbackUrl,
+        AccountReference: transaction.id,
+        TransactionDesc: "Lucky Box Stake",
+      };
+
+      const response = await axios.post(
         `${baseUrl}/mpesa/stkpush/v1/processrequest`,
         payload,
         { headers: { Authorization: `Bearer ${token}` } }
       );
+
+      transaction.checkoutRequestId = response.data?.CheckoutRequestID ?? null;
+      await this.paymentRepo.save(transaction);
+
+      return response.data;
     } catch (error: any) {
       transaction.status = "FAILED";
       transaction.resultCode = "STK_PUSH_FAILED";
@@ -102,12 +106,6 @@ export class PaymentsService {
       await this.paymentRepo.save(transaction);
       throw error;
     }
-
-    transaction.checkoutRequestId =
-      response.data?.CheckoutRequestID ?? null;
-    await this.paymentRepo.save(transaction);
-
-    return response.data;
   }
 
   async handleMpesaCallback(payload: any) {
@@ -138,6 +136,7 @@ export class PaymentsService {
     }
 
     await this.paymentRepo.save(transaction);
+    
     return { ok: true };
   }
 
@@ -251,8 +250,10 @@ export class PaymentsService {
   }
 
   private extractPayerName(metadata: any[]) {
-    const findValue = (label: string) =>
-      metadata.find((item: any) => item.Name === label)?.Value;
+    const findValue = (name: string) => {
+      const item = metadata.find((item: any) => item.Name === name);
+      return item?.Value;
+    };
 
     const direct =
       findValue("CustomerName") ||
@@ -275,5 +276,11 @@ export class PaymentsService {
     }
 
     return null;
+  }
+
+  async getTransaction(transactionId: string) {
+    return await this.paymentRepo.findOne({ 
+      where: { id: transactionId } 
+    });
   }
 }

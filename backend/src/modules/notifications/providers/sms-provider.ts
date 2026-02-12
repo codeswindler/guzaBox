@@ -4,5 +4,5 @@ export type SmsPayload = {
 };
 
 export interface SmsProvider {
-  send(payload: SmsPayload): Promise<void>;
+  send(payload: SmsPayload): Promise<any>;
 }

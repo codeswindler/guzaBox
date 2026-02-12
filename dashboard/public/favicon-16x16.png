@@ -1,0 +1,13 @@
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="8" cy="8" r="8" fill="#FF6B35"/>
+  
+  <!-- LB Text -->
+  <text x="8" y="11" font-family="Arial, sans-serif" font-size="7" font-weight="bold" text-anchor="middle" fill="white">LB</text>
+  
+  <!-- Lucky box decoration -->
+  <rect x="4" y="3" width="8" height="5" rx="1" fill="rgba(255,255,255,0.2)" stroke="white" stroke-width="0.3"/>
+  <circle cx="6" cy="5.5" r="0.5" fill="white"/>
+  <circle cx="8" cy="5.5" r="0.5" fill="white"/>
+  <circle cx="10" cy="5.5" r="0.5" fill="white"/>
+</svg>

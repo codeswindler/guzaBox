@@ -1,5 +1,5 @@
 {
-  "name": "jazabox-backend",
+  "name": "luckybox-backend",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@nestjs/common": "^10.3.8",
-    "@nestjs/config": "^3.2.2",
+    "@nestjs/config": "^4.0.3",
     "@nestjs/core": "^10.3.8",
     "@nestjs/jwt": "^10.2.0",
     "@nestjs/passport": "^10.0.3",

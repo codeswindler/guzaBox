@@ -4,7 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import api from "../../lib/api";
 
 export default function SimulatorClient() {
-  const menuText = `JazaBox
+  const menuText = `Lucky Box
 Stake Between Ksh. 20 and 30
 Chagua Box yako ya Ushindi
 1. Box 1
@@ -84,10 +84,10 @@ Chagua Box yako ya Ushindi
       <p className="subtle">Dial and test the menu flow with a live handset UI.</p>
       <div className="simulator-header">
         <div className="simulator-brand">
-          <div className="simulator-icon">JZ</div>
+          <div className="simulator-icon">LB</div>
           <div>
             <div className="simulator-heading">USSD Simulator</div>
-            <div className="simulator-subheading">JAZABOX - PROTOTYPE v1.0</div>
+            <div className="simulator-subheading">LUCKY BOX - PROTOTYPE v1.0</div>
           </div>
         </div>
         <div className="simulator-actions">
@@ -162,7 +162,7 @@ Chagua Box yako ya Ushindi
                         className="dialer-key-btn"
                         onClick={() => handleDigitPress("0")}
                       >
-                        <span className="dialer-digit">0</span>
+                        <span className="brand-mark">LB</span>
                         <span className="dialer-letters">+</span>
                       </button>
                       <button

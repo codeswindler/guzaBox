@@ -82,15 +82,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {!isLogin && (
         <header className="top-bar">
           <div className="brand">
-            <span className="brand-mark">JZ</span>
+            <span className="brand-mark">LB</span>
             <div>
-              <div className="brand-title">JazaBox</div>
+              <div className="brand-title">Lucky Box</div>
               <div className="brand-subtitle">Admin Console</div>
             </div>
           </div>
           <nav className="nav">
             <Link href="/">Overview</Link>
             <Link href="/transactions">Transactions</Link>
+            <Link href="/instant-win">Instant Wins</Link>
             <Link href="/payouts">Payouts</Link>
             <Link href="/analytics">Analytics</Link>
             <Link href="/simulator">USSD Simulator</Link>

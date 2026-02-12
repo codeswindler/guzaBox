@@ -7,12 +7,14 @@ import { PaymentsModule } from "./modules/payments/payments.module";
 import { PayoutsModule } from "./modules/payouts/payouts.module";
 import { AnalyticsModule } from "./modules/analytics/analytics.module";
 import { AdminModule } from "./modules/admin/admin.module";
+import { PlayerModule } from "./modules/player/player.module";
 import { AdminUser } from "./modules/auth/entities/admin-user.entity";
 import { OtpCode } from "./modules/auth/entities/otp-code.entity";
 import { UssdSession } from "./modules/ussd/entities/ussd-session.entity";
 import { PaymentTransaction } from "./modules/payments/entities/payment-transaction.entity";
 import { PayoutRelease } from "./modules/payouts/entities/payout-release.entity";
 import { Winner } from "./modules/payouts/entities/winner.entity";
+import { Player } from "./modules/player/entities/player.entity";
 
 @Module({
   imports: [
@@ -33,6 +35,7 @@ import { Winner } from "./modules/payouts/entities/winner.entity";
           PaymentTransaction,
           PayoutRelease,
           Winner,
+          Player,
         ],
         synchronize: config.get<string>("DB_SYNC", "true") === "true",
         logging: config.get<string>("DB_LOGGING", "false") === "true",
@@ -44,6 +47,7 @@ import { Winner } from "./modules/payouts/entities/winner.entity";
     PayoutsModule,
     AnalyticsModule,
     AdminModule,
+    PlayerModule,
   ],
 })
 export class AppModule {}

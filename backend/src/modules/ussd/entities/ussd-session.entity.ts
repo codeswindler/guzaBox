@@ -26,6 +26,12 @@ export class UssdSession {
   @Column({ type: "varchar", length: 255, nullable: true })
   transactionId!: string | null;
 
+  @Column({ type: "varchar", length: 50, nullable: true })
+  betId!: string | null;
+
+  @Column({ type: "decimal", precision: 10, scale: 2, nullable: true })
+  wonAmount!: number | null;
+
   @CreateDateColumn()
   createdAt!: Date;
 
