@@ -21,13 +21,20 @@ export class AdvantaSmsService {
   private readonly shortcode: string;
 
   constructor(private readonly configService: ConfigService) {
-    this.baseUrl = this.configService.get<string>(
+    // Support both ADVENTA_* and ADVANTA_* keys to reduce production misconfig risk.
+    const get = (primary: string, secondary: string, fallback = "") =>
+      this.configService.get<string>(primary) ||
+      this.configService.get<string>(secondary) ||
+      fallback;
+
+    this.baseUrl = get(
       "ADVENTA_BASE_URL",
+      "ADVANTA_BASE_URL",
       "https://developers.advantasms.com/sms-api"
     );
-    this.partnerId = this.configService.get<string>("ADVENTA_PARTNER_ID", "");
-    this.apiKey = this.configService.get<string>("ADVENTA_API_KEY", "");
-    this.shortcode = this.configService.get<string>("ADVENTA_SHORTCODE", "");
+    this.partnerId = get("ADVENTA_PARTNER_ID", "ADVANTA_PARTNER_ID");
+    this.apiKey = get("ADVENTA_API_KEY", "ADVANTA_API_KEY");
+    this.shortcode = get("ADVENTA_SHORTCODE", "ADVANTA_SHORTCODE");
   }
 
   async send(payload: SmsPayload): Promise<AdvantaSmsResponse> {
