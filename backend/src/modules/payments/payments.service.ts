@@ -547,8 +547,6 @@ export class PaymentsService {
     const count = Math.max(2, Math.min(opts.boxCount, 20));
     const selected = Math.max(1, Math.min(opts.selectedBox, count));
 
-    // Create at least one winning box. If forceLose, ensure it's not the selected box.
-    const winnersTarget = Math.random() > 0.7 ? 2 : 1;
     const results: { [key: number]: number } = {};
 
     // Start with all zeros.
@@ -556,25 +554,44 @@ export class PaymentsService {
 
     const candidateBoxes = Array.from({ length: count }, (_, idx) => idx + 1);
     const shuffled = candidateBoxes.sort(() => Math.random() - 0.5);
-    const winnerBoxes: number[] = [];
 
-    for (const b of shuffled) {
-      if (winnerBoxes.length >= winnersTarget) break;
-      if (opts.forceLose && b === selected) continue;
-      winnerBoxes.push(b);
-    }
-    if (winnerBoxes.length === 0) {
-      // As a last resort, pick the first non-selected box.
-      winnerBoxes.push(selected === 1 ? 2 : 1);
-    }
+    if (opts.forceLose && count >= 5) {
+      // For the 5-box game: exactly 2 losing boxes (including the chosen one),
+      // and 3 winning boxes so the SMS shows clear "you nearly won" alternatives.
+      const loserBoxes = new Set<number>([selected]);
+      for (const b of shuffled) {
+        if (loserBoxes.size >= 2) break;
+        if (b === selected) continue;
+        loserBoxes.add(b);
+      }
 
-    for (const b of winnerBoxes) {
-      // Sample values similar to your example; keep them as integers.
-      results[b] = this.randomBetween(50, 9999);
-    }
+      for (let i = 1; i <= count; i++) {
+        if (loserBoxes.has(i)) {
+          results[i] = 0;
+        } else {
+          results[i] = this.randomBetween(50, 9999);
+        }
+      }
+    } else {
+      // Generic fallback: ensure at least one winning box. If forceLose, ensure it's not the selected box.
+      const winnersTarget = Math.random() > 0.7 ? 2 : 1;
+      const winnerBoxes: number[] = [];
 
-    // Ensure losing selected box has 0.
-    if (opts.forceLose) results[selected] = 0;
+      for (const b of shuffled) {
+        if (winnerBoxes.length >= winnersTarget) break;
+        if (opts.forceLose && b === selected) continue;
+        winnerBoxes.push(b);
+      }
+      if (winnerBoxes.length === 0) {
+        winnerBoxes.push(selected === 1 ? 2 : 1);
+      }
+
+      for (const b of winnerBoxes) {
+        results[b] = this.randomBetween(50, 9999);
+      }
+
+      if (opts.forceLose) results[selected] = 0;
+    }
 
     return results;
   }

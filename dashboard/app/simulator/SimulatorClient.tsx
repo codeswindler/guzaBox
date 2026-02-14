@@ -117,7 +117,8 @@ Chagua Box yako ya Ushindi
     // Ensure at least 1-2 *additional* losing boxes to make the SMS feel realistic.
     const boxResults: Record<number, number> = {};
     const otherBoxes = [1, 2, 3, 4, 5].filter((b) => b !== selectedBox);
-    const extraLosingCount = randomInt(1, 2);
+    // Exactly 2 losing boxes total (chosen + one other), and 3 winning boxes.
+    const extraLosingCount = 1;
     const extraLosingBoxes = new Set<number>();
     while (extraLosingBoxes.size < extraLosingCount) {
       extraLosingBoxes.add(otherBoxes[randomInt(0, otherBoxes.length - 1)]);

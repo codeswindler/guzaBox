@@ -250,30 +250,48 @@ export class InstantWinController {
     const count = Math.max(2, Math.min(opts.boxCount, 20));
     const selected = Math.max(1, Math.min(opts.selectedBox, count));
 
-    const winnersTarget = Math.random() > 0.7 ? 2 : 1;
     const results: { [key: number]: number } = {};
     for (let i = 1; i <= count; i++) results[i] = 0;
 
     const candidateBoxes = Array.from({ length: count }, (_, idx) => idx + 1);
     const shuffled = candidateBoxes.sort(() => Math.random() - 0.5);
-    const winnerBoxes: number[] = [];
-
-    for (const b of shuffled) {
-      if (winnerBoxes.length >= winnersTarget) break;
-      if (opts.forceLose && b === selected) continue;
-      winnerBoxes.push(b);
-    }
-    if (winnerBoxes.length === 0) {
-      winnerBoxes.push(selected === 1 ? 2 : 1);
-    }
 
     const randomBetween = (min: number, max: number) =>
       Math.floor(min + Math.random() * (max - min + 1));
 
-    for (const b of winnerBoxes) {
-      results[b] = randomBetween(50, 9999);
+    if (opts.forceLose && count >= 5) {
+      const loserBoxes = new Set<number>([selected]);
+      for (const b of shuffled) {
+        if (loserBoxes.size >= 2) break;
+        if (b === selected) continue;
+        loserBoxes.add(b);
+      }
+
+      for (let i = 1; i <= count; i++) {
+        if (loserBoxes.has(i)) {
+          results[i] = 0;
+        } else {
+          results[i] = randomBetween(50, 9999);
+        }
+      }
+    } else {
+      const winnersTarget = Math.random() > 0.7 ? 2 : 1;
+      const winnerBoxes: number[] = [];
+
+      for (const b of shuffled) {
+        if (winnerBoxes.length >= winnersTarget) break;
+        if (opts.forceLose && b === selected) continue;
+        winnerBoxes.push(b);
+      }
+      if (winnerBoxes.length === 0) {
+        winnerBoxes.push(selected === 1 ? 2 : 1);
+      }
+
+      for (const b of winnerBoxes) {
+        results[b] = randomBetween(50, 9999);
+      }
+      if (opts.forceLose) results[selected] = 0;
     }
-    if (opts.forceLose) results[selected] = 0;
 
     return results;
   }
