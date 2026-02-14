@@ -15,12 +15,12 @@ export class SmsService {
 
   async sendOtp(phone: string, code: string) {
     const message = `Your Lucky Box OTP is ${code}. It expires in 5 minutes.`;
-    await this.provider.send({ to: phone, message });
+    await this.sendOrThrow({ to: phone, message });
   }
 
   async sendWinNotification(phoneNumber: string, amount: number, betId: string) {
     const message = `CONGRATULATIONS! You won Ksh ${amount}!\n\nBet ID: ${betId}\n\nYour prize will be sent to your M-Pesa account shortly.\n\nThank you for playing Lucky Box!`;
-    await this.provider.send({ to: phoneNumber, message });
+    await this.sendOrThrow({ to: phoneNumber, message });
   }
 
   async sendLossNotification(
@@ -45,12 +45,12 @@ Bet: ${betId}
 
 Dial ${ussdCode} to win more.`;
     
-    await this.provider.send({ to: phoneNumber, message });
+    await this.sendOrThrow({ to: phoneNumber, message });
   }
 
   async sendAutoWinNotification(phoneNumber: string, amount: number, betId: string) {
     const message = `🎉 INSTANT WIN! You won Ksh ${amount}!\n\nBet ID: ${betId}\n\nPrize sent to your M-Pesa immediately.\n\nPlay Lucky Box again for more chances to win!`;
-    await this.provider.send({ to: phoneNumber, message });
+    await this.sendOrThrow({ to: phoneNumber, message });
   }
 
   private getUssdCode() {
@@ -68,7 +68,26 @@ Dial ${ussdCode} to win more.`;
   }
 
   async send(payload: SmsPayload) {
-    await this.provider.send(payload);
+    await this.sendOrThrow(payload);
+  }
+
+  private async sendOrThrow(payload: SmsPayload) {
+    const result = await this.provider.send(payload);
+
+    // Some providers (stub) return void; treat that as success.
+    if (!result || typeof result !== "object") return;
+
+    const status = (result as any).status;
+    if (typeof status !== "string") return;
+
+    const normalized = status.toLowerCase().trim();
+    if (["success", "ok", "sent"].includes(normalized)) return;
+
+    const reason =
+      typeof (result as any).message === "string" ? (result as any).message : "";
+    throw new Error(
+      `SMS provider reported failure (status=${status})${reason ? `: ${reason}` : ""}`
+    );
   }
 
   private resolveProvider(providerName: string): SmsProvider {
