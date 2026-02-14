@@ -17,6 +17,16 @@ export class PaymentsController {
     return this.paymentsService.handleMpesaCallback(payload);
   }
 
+  @Post("mpesa/b2c/result")
+  async mpesaB2cResult(@Body() payload: any) {
+    return this.paymentsService.handleMpesaB2cResult(payload);
+  }
+
+  @Post("mpesa/b2c/timeout")
+  async mpesaB2cTimeout(@Body() payload: any) {
+    return this.paymentsService.handleMpesaB2cTimeout(payload);
+  }
+
   @Get("transactions")
   async listTransactions(
     @Query("status") status?: string,
@@ -41,13 +51,13 @@ export class PaymentsController {
 
   @Get("kpis")
   async kpis() {
-    return {"message": "KPIS not implemented"};
+    return this.paymentsService.getKpis();
   }
 
   @Get("leaderboard")
   async leaderboard(@Query("range") range = "daily") {
     const normalized =
       range === "weekly" || range === "monthly" ? range : "daily";
-    return {"message": "Leaderboard not implemented"};
+    return this.paymentsService.getLeaderboard(normalized);
   }
 }

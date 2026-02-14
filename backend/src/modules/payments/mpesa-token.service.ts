@@ -23,7 +23,6 @@ export class MpesaTokenService {
     const baseUrl = this.configService.get<string>("MPESA_BASE_URL");
 
     this.logger.log(`Generating M-Pesa token with URL: ${baseUrl}`);
-    this.logger.log(`Consumer Key: ${consumerKey?.substring(0, 10)}...`);
 
     if (!consumerKey || !consumerSecret || !baseUrl) {
       throw new Error("M-Pesa consumer credentials not configured");
@@ -31,7 +30,6 @@ export class MpesaTokenService {
 
     try {
       const auth = Buffer.from(`${consumerKey}:${consumerSecret}`).toString("base64");
-      this.logger.log(`Auth header: Basic ${auth.substring(0, 20)}...`);
 
       const response = await axios.get(
         `${baseUrl}/oauth/v1/generate?grant_type=client_credentials`,
@@ -48,7 +46,7 @@ export class MpesaTokenService {
       // Set expiry to 55 minutes from now (tokens expire in 1 hour)
       this.tokenExpiry = new Date(Date.now() + 55 * 60 * 1000);
 
-      this.logger.log(`M-Pesa access token generated successfully: ${this.accessToken?.substring(0, 20)}...`);
+      this.logger.log("M-Pesa access token generated successfully");
       
       if (!this.accessToken) {
         this.logger.error('No access token received from M-Pesa');

@@ -20,7 +20,7 @@ export class InstantGratificationService {
     const totalPayouts = await this.transactionRepo
       .createQueryBuilder("transaction")
       .select("SUM(transaction.amount)", "total")
-      .where("transaction.status = :status", { status: "SUCCESS" })
+      .where("transaction.status IN (:...statuses)", { statuses: ["PAID", "SUCCESS"] })
       .getRawOne();
 
     return {
@@ -52,7 +52,7 @@ export class InstantGratificationService {
     const transaction = await this.transactionRepo.save({
       phoneNumber,
       amount,
-      status: "SUCCESS",
+      status: "PAID",
       type: "INSTANT_WIN",
       reference: `MANUAL_${Date.now()}`,
     });

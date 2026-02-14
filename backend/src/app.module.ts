@@ -15,6 +15,7 @@ import { PaymentTransaction } from "./modules/payments/entities/payment-transact
 import { PayoutRelease } from "./modules/payouts/entities/payout-release.entity";
 import { Winner } from "./modules/payouts/entities/winner.entity";
 import { Player } from "./modules/player/entities/player.entity";
+import { InstantWinSettings } from "./modules/admin/entities/instant-win-settings.entity";
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { Player } from "./modules/player/entities/player.entity";
           PayoutRelease,
           Winner,
           Player,
+          InstantWinSettings,
         ],
         synchronize: config.get<string>("DB_SYNC", "true") === "true",
         logging: config.get<string>("DB_LOGGING", "false") === "true",

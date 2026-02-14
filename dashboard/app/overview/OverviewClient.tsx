@@ -26,6 +26,30 @@ export default function OverviewClient() {
   const [instantWinStatus, setInstantWinStatus] = useState<any>(null);
   const [error, setError] = useState("");
 
+  const normalizeInstantWinStatus = (value: unknown) => {
+    if (!value || typeof value !== "object") return null;
+    const source = value as Record<string, any>;
+    const config =
+      source.config && typeof source.config === "object" ? source.config : {};
+    const settings =
+      source.settings && typeof source.settings === "object"
+        ? source.settings
+        : {
+            baseProbability: Number(config.instantWinBaseProbability ?? 0),
+            maxPercentage: Number(config.instantWinPercentage ?? 0),
+          };
+    return {
+      enabled:
+        typeof source.enabled === "boolean"
+          ? source.enabled
+          : Boolean(config.instantWinEnabled ?? false),
+      settings: {
+        baseProbability: Number(settings.baseProbability ?? 0),
+        maxPercentage: Number(settings.maxPercentage ?? 0),
+      },
+    };
+  };
+
   const formatMoney = (value: number) =>
     new Intl.NumberFormat("en-KE", {
       style: "currency",
@@ -43,7 +67,7 @@ export default function OverviewClient() {
       ]);
       setOverview(overviewRes.data);
       setReleases(releasesRes.data ?? []);
-      setInstantWinStatus(instantWinRes.data);
+      setInstantWinStatus(normalizeInstantWinStatus(instantWinRes.data));
     } catch (err: any) {
       setError("Live overview unavailable. Ensure API access and seed data.");
     }

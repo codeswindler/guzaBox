@@ -25,6 +25,36 @@ type Kpis = {
   allTime: KpiBlock;
 };
 
+const ZERO_KPI: KpiBlock = { count: 0, amount: 0 };
+
+const normalizeKpiBlock = (value: unknown): KpiBlock => {
+  if (!value || typeof value !== "object") return ZERO_KPI;
+  const candidate = value as { count?: unknown; amount?: unknown };
+  const count =
+    typeof candidate.count === "number" && Number.isFinite(candidate.count)
+      ? candidate.count
+      : 0;
+  const amount =
+    typeof candidate.amount === "number" && Number.isFinite(candidate.amount)
+      ? candidate.amount
+      : 0;
+  return { count, amount };
+};
+
+const normalizeKpis = (value: unknown): Kpis => {
+  const source =
+    value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  return {
+    today: normalizeKpiBlock(source.today),
+    yesterday: normalizeKpiBlock(source.yesterday),
+    last7: normalizeKpiBlock(source.last7),
+    prev7: normalizeKpiBlock(source.prev7),
+    last30: normalizeKpiBlock(source.last30),
+    prev30: normalizeKpiBlock(source.prev30),
+    allTime: normalizeKpiBlock(source.allTime),
+  };
+};
+
 export default function TransactionsClient() {
   const [items, setItems] = useState<Transaction[]>([]);
   const [status, setStatus] = useState("");
@@ -122,7 +152,7 @@ export default function TransactionsClient() {
         api.get("/payments/transactions", { params }),
         api.get("/payments/kpis"),
       ]);
-      const data: Transaction[] = txRes.data;
+      const data: Transaction[] = Array.isArray(txRes.data) ? txRes.data : [];
       if (data.length > 0) {
         const latestId = data[0].id;
         if (lastSeenRef.current && latestId !== lastSeenRef.current) {
@@ -144,7 +174,7 @@ export default function TransactionsClient() {
         lastSeenRef.current = latestId;
       }
       setItems(data);
-      setKpis(kpiRes.data);
+      setKpis(normalizeKpis(kpiRes.data));
     } catch (error) {
       setError("Live transactions unavailable. Check API connection.");
     }

@@ -15,19 +15,30 @@ export interface AdvantaSmsResponse {
 
 @Injectable()
 export class AdvantaSmsService {
-  private readonly baseUrl = "https://developers.advantasms.com/sms-api";
+  private readonly baseUrl: string;
   private readonly partnerId: string;
   private readonly apiKey: string;
   private readonly shortcode: string;
 
   constructor(private readonly configService: ConfigService) {
-    this.partnerId = this.configService.get<string>("ADVENTA_PARTNER_ID", "15676");
-    this.apiKey = this.configService.get<string>("ADVENTA_API_KEY", "332843d3e73bfacccf0a64a18d6b86d7");
-    this.shortcode = this.configService.get<string>("ADVENTA_SHORTCODE", "AdvantaSMS");
+    this.baseUrl = this.configService.get<string>(
+      "ADVENTA_BASE_URL",
+      "https://developers.advantasms.com/sms-api"
+    );
+    this.partnerId = this.configService.get<string>("ADVENTA_PARTNER_ID", "");
+    this.apiKey = this.configService.get<string>("ADVENTA_API_KEY", "");
+    this.shortcode = this.configService.get<string>("ADVENTA_SHORTCODE", "");
   }
 
   async send(payload: SmsPayload): Promise<AdvantaSmsResponse> {
     try {
+      if (!this.partnerId || !this.apiKey || !this.shortcode) {
+        return {
+          status: "failed",
+          message: "Advanta SMS credentials are not configured",
+        };
+      }
+
       const requestData = {
         partnerId: this.partnerId,
         apiKey: this.apiKey,
@@ -36,7 +47,19 @@ export class AdvantaSmsService {
         message: payload.message,
       };
 
-      console.log(`Sending SMS via Advanta:`, JSON.stringify(requestData, null, 2));
+      console.log(
+        "Sending SMS via Advanta",
+        JSON.stringify(
+          {
+            partnerId: this.partnerId,
+            shortcode: this.shortcode,
+            mobile: requestData.mobile,
+            messageLength: payload.message.length,
+          },
+          null,
+          2
+        )
+      );
 
       const response = await axios.post(
         `${this.baseUrl}/send`,

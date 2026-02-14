@@ -10,6 +10,8 @@ type InstantWinStatus = {
     maxPercentage: number;
     minAmount: number;
     maxAmount: number;
+    loserMessage: string;
+    sendWinnerMessages: boolean;
   };
   todayStats: {
     totalCollected: number;
@@ -19,6 +21,119 @@ type InstantWinStatus = {
     currentProbability: number;
     budgetUsagePercentage: number;
   };
+  anomaly?: {
+    active: boolean;
+    level: "normal" | "warn" | "critical";
+    badge: string;
+    description: string;
+    checks: string[];
+  };
+};
+
+const DEFAULT_STATUS: InstantWinStatus = {
+  enabled: false,
+  settings: {
+    baseProbability: 0,
+    maxPercentage: 0,
+    minAmount: 0,
+    maxAmount: 0,
+    loserMessage: "Almost won. Try again.",
+    sendWinnerMessages: false,
+  },
+  todayStats: {
+    totalCollected: 0,
+    prizePoolLimit: 0,
+    totalPrizesPaid: 0,
+    remainingBudget: 0,
+    currentProbability: 0,
+    budgetUsagePercentage: 0,
+  },
+  anomaly: {
+    active: false,
+    level: "normal",
+    badge: "Healthy",
+    description: "Budget usage is within normal operating range.",
+    checks: [],
+  },
+};
+
+const toNumber = (value: unknown, fallback = 0) => {
+  const numeric = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
+};
+
+const normalizeStatus = (value: unknown): InstantWinStatus => {
+  if (!value || typeof value !== "object") return DEFAULT_STATUS;
+  const source = value as Record<string, any>;
+  const config =
+    source.config && typeof source.config === "object" ? source.config : {};
+  const incomingSettings =
+    source.settings && typeof source.settings === "object" ? source.settings : {};
+  const incomingTodayStats =
+    source.todayStats && typeof source.todayStats === "object"
+      ? source.todayStats
+      : {};
+
+  const enabled =
+    typeof source.enabled === "boolean"
+      ? source.enabled
+      : Boolean(config.instantWinEnabled ?? false);
+  const settings = {
+    baseProbability: toNumber(
+      incomingSettings.baseProbability ?? config.instantWinBaseProbability
+    ),
+    maxPercentage: toNumber(
+      incomingSettings.maxPercentage ?? config.instantWinPercentage
+    ),
+    minAmount: toNumber(incomingSettings.minAmount ?? config.instantWinMinAmount),
+    maxAmount: toNumber(incomingSettings.maxAmount ?? config.instantWinMaxAmount),
+    loserMessage: String(
+      incomingSettings.loserMessage ?? config.loserMessage ?? "Almost won. Try again."
+    ),
+    sendWinnerMessages: Boolean(
+      incomingSettings.sendWinnerMessages ?? config.sendWinnerMessages ?? false
+    ),
+  };
+  const todayStats = {
+    totalCollected: toNumber(incomingTodayStats.totalCollected),
+    prizePoolLimit: toNumber(
+      incomingTodayStats.prizePoolLimit,
+      (settings.maxPercentage / 100) * toNumber(incomingTodayStats.totalCollected)
+    ),
+    totalPrizesPaid: toNumber(incomingTodayStats.totalPrizesPaid),
+    remainingBudget: toNumber(
+      incomingTodayStats.remainingBudget,
+      toNumber(incomingTodayStats.prizePoolLimit) -
+        toNumber(incomingTodayStats.totalPrizesPaid)
+    ),
+    currentProbability: toNumber(
+      incomingTodayStats.currentProbability,
+      settings.baseProbability
+    ),
+    budgetUsagePercentage: toNumber(
+      incomingTodayStats.budgetUsagePercentage,
+      0
+    ),
+  };
+
+  const anomalySource =
+    source.anomaly && typeof source.anomaly === "object" ? source.anomaly : {};
+  const anomaly = {
+    active: Boolean(anomalySource.active ?? false),
+    level:
+      anomalySource.level === "critical" || anomalySource.level === "warn"
+        ? anomalySource.level
+        : "normal",
+    badge: String(anomalySource.badge ?? "Healthy"),
+    description: String(
+      anomalySource.description ?? "Budget usage is within normal operating range."
+    ),
+    checks: Array.isArray(anomalySource.checks)
+      ? anomalySource.checks.map((item: unknown) => String(item))
+      : [],
+  };
+
+  return { enabled, settings, todayStats, anomaly };
 };
 
 export default function InstantWinPage() {
@@ -32,14 +147,17 @@ export default function InstantWinPage() {
     maxPercentage: 10,
     minAmount: 100,
     maxAmount: 1000,
+    loserMessage: "Almost won. Try again.",
+    sendWinnerMessages: false,
   });
 
   const loadStatus = async () => {
     try {
       setError("");
       const res = await api.get("/admin/instant-win/status");
-      setStatus(res.data);
-      setSettings(res.data.settings);
+      const normalized = normalizeStatus(res.data);
+      setStatus(normalized);
+      setSettings(normalized.settings);
     } catch (err: any) {
       setError("Failed to load instant win status");
     }
@@ -104,6 +222,36 @@ export default function InstantWinPage() {
 
       {status && (
         <>
+          {status.anomaly?.active && (
+            <div
+              className="card demo-card"
+              style={{
+                border: `1px solid ${
+                  status.anomaly.level === "critical" ? "#ef4444" : "#f59e0b"
+                }`,
+                backgroundColor:
+                  status.anomaly.level === "critical" ? "#fee2e2" : "#fef3c7",
+              }}
+            >
+              <p
+                style={{
+                  fontWeight: 700,
+                  marginBottom: "8px",
+                  color: status.anomaly.level === "critical" ? "#991b1b" : "#92400e",
+                }}
+              >
+                {status.anomaly.level === "critical" ? "CRITICAL" : "WARNING"} ·{" "}
+                {status.anomaly.badge}
+              </p>
+              <p style={{ marginBottom: "8px" }}>{status.anomaly.description}</p>
+              {status.anomaly.checks.length > 0 && (
+                <p className="subtle">
+                  Check now: {status.anomaly.checks.join(" | ")}
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Status Card */}
           <div className="card demo-card">
             <h3>Current Status</h3>
@@ -179,7 +327,10 @@ export default function InstantWinPage() {
                 value={settings.baseProbability}
                 onChange={(e) => setSettings({...settings, baseProbability: Number(e.target.value)})}
               />
-              <span className="subtle">{formatPercent(settings.baseProbability)} chance per game</span>
+              <span className="subtle">
+                Tip: baseline chance per paid game before budget checks. Higher
+                values create more winners and consume pool faster.
+              </span>
             </div>
             
             <div className="input-row">
@@ -192,7 +343,10 @@ export default function InstantWinPage() {
                 value={settings.maxPercentage}
                 onChange={(e) => setSettings({...settings, maxPercentage: Number(e.target.value)})}
               />
-              <span className="subtle">% of collections for prizes</span>
+              <span className="subtle">
+                Tip: hard cap on payouts for the day. At 50, total prizes can
+                never exceed 50% of today's paid collections.
+              </span>
             </div>
             
             <div className="input-row">
@@ -205,7 +359,10 @@ export default function InstantWinPage() {
                 value={settings.minAmount}
                 onChange={(e) => setSettings({...settings, minAmount: Number(e.target.value)})}
               />
-              <span className="subtle">Minimum instant prize</span>
+              <span className="subtle">
+                Tip: minimum win amount. If remaining budget is below this,
+                system auto-switches to loser outcomes.
+              </span>
             </div>
             
             <div className="input-row">
@@ -218,7 +375,45 @@ export default function InstantWinPage() {
                 value={settings.maxAmount}
                 onChange={(e) => setSettings({...settings, maxAmount: Number(e.target.value)})}
               />
-              <span className="subtle">Maximum instant prize</span>
+              <span className="subtle">
+                Tip: upper bound per winning ticket. Keep this near your target
+                economics to reduce variance.
+              </span>
+            </div>
+
+            <div className="input-row">
+              <label>Loser Message</label>
+              <input
+                type="text"
+                maxLength={500}
+                value={settings.loserMessage}
+                onChange={(e) =>
+                  setSettings({ ...settings, loserMessage: e.target.value })
+                }
+              />
+              <span className="subtle">
+                Tip: message sent when player does not win. Use clear, friendly
+                text that encourages replay.
+              </span>
+            </div>
+
+            <div className="input-row">
+              <label>Send Winner SMS</label>
+              <select
+                value={settings.sendWinnerMessages ? "yes" : "no"}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    sendWinnerMessages: e.target.value === "yes",
+                  })
+                }
+              >
+                <option value="no">No</option>
+                <option value="yes">Yes</option>
+              </select>
+              <span className="subtle">
+                Tip: enables/disables SMS notifications for winners only.
+              </span>
             </div>
             
             <button 

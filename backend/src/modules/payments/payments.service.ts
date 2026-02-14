@@ -1,20 +1,35 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { DataSource, Repository } from "typeorm";
 import { ConfigService } from "@nestjs/config";
 import axios from "axios";
 import { PaymentTransaction } from "./entities/payment-transaction.entity";
 import { MpesaTokenService } from "./mpesa-token.service";
+import { Winner } from "../payouts/entities/winner.entity";
+import { PayoutRelease } from "../payouts/entities/payout-release.entity";
+import { UssdSession } from "../ussd/entities/ussd-session.entity";
+import { SmsService } from "../notifications/sms.service";
+import { InstantWinSettings } from "../admin/entities/instant-win-settings.entity";
 
 @Injectable()
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
+  private readonly paidStatuses = ["PAID", "SUCCESS"];
+  private readonly anomalyAlertBuckets = new Map<string, number>();
 
   constructor(
     @InjectRepository(PaymentTransaction)
     private readonly paymentRepo: Repository<PaymentTransaction>,
+    @InjectRepository(Winner)
+    private readonly winnerRepo: Repository<Winner>,
+    @InjectRepository(PayoutRelease)
+    private readonly releaseRepo: Repository<PayoutRelease>,
+    @InjectRepository(UssdSession)
+    private readonly sessionRepo: Repository<UssdSession>,
     private readonly configService: ConfigService,
     private readonly mpesaTokenService: MpesaTokenService,
+    private readonly smsService: SmsService,
+    private readonly dataSource: DataSource,
   ) {}
 
   async markStalePendingTransactions() {
@@ -66,7 +81,7 @@ export class PaymentsService {
       this.logger.log('MOCK: Simulating successful STK push');
       
       transaction.checkoutRequestId = `mock_checkout_${Date.now()}`;
-      transaction.status = "SUCCESS" as any;
+      transaction.status = "PAID" as any;
       transaction.resultCode = "0";
       transaction.resultDesc = "Mock successful payment";
       await this.paymentRepo.save(transaction);
@@ -165,17 +180,528 @@ export class PaymentsService {
     const resultCode = String(stk.ResultCode ?? "");
     const resultDesc = String(stk.ResultDesc ?? "");
 
-    const transaction = await this.paymentRepo.findOne({
-      where: { checkoutRequestId },
-    });
+    const outcome = await this.dataSource.transaction(
+      "SERIALIZABLE",
+      async (manager) => {
+        const transaction = await manager
+          .getRepository(PaymentTransaction)
+          .createQueryBuilder("tx")
+          .setLock("pessimistic_write")
+          .where("tx.checkoutRequestId = :checkoutRequestId", { checkoutRequestId })
+          .getOne();
 
-    if (!transaction) return { ok: false };
+        if (!transaction) return { ok: false, message: "Transaction not found" };
 
-    transaction.status = (resultCode === "0" ? "SUCCESS" : "FAILED") as any;
-    transaction.resultCode = resultCode;
-    transaction.resultDesc = resultDesc;
-    await this.paymentRepo.save(transaction);
+        if (transaction.status === "PAID" || transaction.status === "FAILED") {
+          return {
+            ok: true,
+            won: Boolean(transaction.wonAmount && Number(transaction.wonAmount) > 0),
+            prizeAmount: Number(transaction.wonAmount ?? 0),
+            message: "Already processed",
+          };
+        }
 
+        transaction.status = (resultCode === "0" ? "PAID" : "FAILED") as any;
+        transaction.resultCode = resultCode;
+        transaction.resultDesc = resultDesc;
+        await manager.getRepository(PaymentTransaction).save(transaction);
+
+        if (resultCode !== "0") {
+          await this.markSessionLost(manager, transaction.sessionId);
+          return { ok: true, won: false, message: "Payment failed" };
+        }
+
+        const settings = await this.getInstantWinSettings(manager);
+        const instantEnabled = settings.enabled;
+        if (!instantEnabled) {
+          await this.markSessionLost(manager, transaction.sessionId);
+          return { ok: true, won: false, message: "Instant wins disabled" };
+        }
+
+        const capPercent = Number(settings.maxPercentage);
+        const minWin = Number(settings.minAmount);
+        const maxWin = Number(settings.maxAmount);
+        const baseProbability = Number(settings.baseProbability);
+
+        const { startToday, startTomorrow } = this.getNairobiDayBounds();
+
+        const collectedRow = await manager
+          .getRepository(PaymentTransaction)
+          .createQueryBuilder("tx")
+          .select("SUM(tx.amount)", "amount")
+          .where("tx.status = :status", { status: "PAID" })
+          .andWhere("tx.createdAt >= :start", { start: startToday })
+          .andWhere("tx.createdAt < :end", { end: startTomorrow })
+          .getRawOne();
+        const collectedToday = Number(collectedRow?.amount ?? 0);
+        const capAmount = Math.max(0, (collectedToday * capPercent) / 100);
+
+        const paidOutRow = await manager
+          .getRepository(Winner)
+          .createQueryBuilder("winner")
+          .leftJoin("winner.release", "release")
+          .select("SUM(winner.amount)", "amount")
+          .where("release.createdBy = :createdBy", {
+            createdBy: "instant-win-system",
+          })
+          .andWhere("winner.createdAt >= :start", { start: startToday })
+          .andWhere("winner.createdAt < :end", { end: startTomorrow })
+          .getRawOne();
+        const paidOutToday = Number(paidOutRow?.amount ?? 0);
+
+        const remainingBudget = Math.max(capAmount - paidOutToday, 0);
+        const canAffordMinimum =
+          Number.isFinite(minWin) && minWin > 0 && remainingBudget >= minWin;
+        const probabilityPass =
+          Number.isFinite(baseProbability) &&
+          baseProbability > 0 &&
+          Math.random() <= Math.min(Math.max(baseProbability, 0), 1);
+
+        if (!canAffordMinimum || !probabilityPass) {
+          await this.markSessionLost(manager, transaction.sessionId);
+          return {
+            ok: true,
+            won: false,
+            message: "No win",
+            capAmount,
+            remainingBudget,
+          };
+        }
+
+        const cappedMax = Math.min(maxWin, remainingBudget);
+        if (cappedMax < minWin) {
+          await this.markSessionLost(manager, transaction.sessionId);
+          return {
+            ok: true,
+            won: false,
+            message: "Budget exhausted",
+            capAmount,
+            remainingBudget,
+          };
+        }
+
+        const prizeAmount = this.randomBetween(minWin, cappedMax);
+        const releaseRepo = manager.getRepository(PayoutRelease);
+        let release = await releaseRepo
+          .createQueryBuilder("release")
+          .setLock("pessimistic_write")
+          .where("release.createdBy = :createdBy", {
+            createdBy: "instant-win-system",
+          })
+          .andWhere("release.createdAt >= :start", { start: startToday })
+          .andWhere("release.createdAt < :end", { end: startTomorrow })
+          .getOne();
+
+        if (!release) {
+          release = await releaseRepo.save(
+            releaseRepo.create({
+              percentage: capPercent,
+              minWin,
+              maxWin,
+              releaseBudget: capAmount,
+              totalReleased: 0,
+              totalWinners: 0,
+              createdBy: "instant-win-system",
+            })
+          );
+        } else {
+          release.percentage = capPercent;
+          release.minWin = minWin;
+          release.maxWin = maxWin;
+          release.releaseBudget = capAmount;
+        }
+
+        await manager.getRepository(Winner).save(
+          manager.getRepository(Winner).create({
+            transaction,
+            release,
+            amount: prizeAmount,
+          })
+        );
+
+        transaction.wonAmount = prizeAmount;
+        transaction.released = true;
+        await manager.getRepository(PaymentTransaction).save(transaction);
+
+        release.totalWinners += 1;
+        release.totalReleased = Number(release.totalReleased) + prizeAmount;
+        await releaseRepo.save(release);
+
+        await this.markSessionWon(manager, transaction.sessionId, prizeAmount);
+        return {
+          ok: true,
+          won: true,
+          prizeAmount,
+          capAmount,
+          remainingBudget: Math.max(remainingBudget - prizeAmount, 0),
+          phoneNumber: transaction.phoneNumber,
+          transactionId: transaction.id,
+        };
+      }
+    );
+
+    const globalSettings = await this.getInstantWinSettings(this.dataSource.manager);
+    this.emitAnomalyAlertIfNeeded(outcome);
+    if (
+      outcome.ok &&
+      outcome.won &&
+      outcome.phoneNumber &&
+      globalSettings.sendWinnerMessages
+    ) {
+      try {
+        await this.smsService.sendWinNotification(
+          outcome.phoneNumber,
+          outcome.prizeAmount,
+          outcome.transactionId
+        );
+      } catch (error) {
+        this.logger.warn(`Winner SMS failed: ${(error as Error).message}`);
+      }
+    } else if (outcome.ok && outcome.won === false) {
+      const loserMessage = globalSettings.loserMessage || "Almost won. Try again.";
+      const transaction = await this.paymentRepo.findOne({
+        where: { checkoutRequestId },
+      });
+      if (transaction?.phoneNumber) {
+        try {
+          await this.smsService.send({ to: transaction.phoneNumber, message: loserMessage });
+        } catch (error) {
+          this.logger.warn(`Loser SMS failed: ${(error as Error).message}`);
+        }
+      }
+    }
+
+    if (outcome.ok && outcome.won && outcome.phoneNumber) {
+      try {
+        await this.initiateB2CPayout({
+          phoneNumber: outcome.phoneNumber,
+          amount: Number(outcome.prizeAmount),
+          reference: outcome.transactionId,
+        });
+      } catch (error) {
+        this.logger.error(
+          `B2C payout initiation failed: ${(error as Error).message}`
+        );
+      }
+    }
+
+    return outcome;
+  }
+
+  async handleMpesaB2cResult(payload: any) {
+    this.logger.log(
+      JSON.stringify({
+        event: "mpesa_b2c_result",
+        payload,
+      })
+    );
     return { ok: true };
+  }
+
+  async handleMpesaB2cTimeout(payload: any) {
+    this.logger.warn(
+      JSON.stringify({
+        event: "mpesa_b2c_timeout",
+        payload,
+      })
+    );
+    return { ok: true };
+  }
+
+  async getKpis() {
+    const { startToday, startTomorrow } = this.getNairobiDayBounds();
+    const startYesterday = new Date(startToday);
+    startYesterday.setDate(startYesterday.getDate() - 1);
+
+    const startLast7 = new Date(startToday);
+    startLast7.setDate(startLast7.getDate() - 6);
+    const startPrev7 = new Date(startLast7);
+    startPrev7.setDate(startPrev7.getDate() - 7);
+
+    const startLast30 = new Date(startToday);
+    startLast30.setDate(startLast30.getDate() - 29);
+    const startPrev30 = new Date(startLast30);
+    startPrev30.setDate(startPrev30.getDate() - 30);
+
+    const [today, yesterday, last7, prev7, last30, prev30, allTime] =
+      await Promise.all([
+        this.countAndSumPaid(startToday, startTomorrow),
+        this.countAndSumPaid(startYesterday, startToday),
+        this.countAndSumPaid(startLast7, startTomorrow),
+        this.countAndSumPaid(startPrev7, startLast7),
+        this.countAndSumPaid(startLast30, startTomorrow),
+        this.countAndSumPaid(startPrev30, startLast30),
+        this.countAndSumPaid(),
+      ]);
+
+    return { today, yesterday, last7, prev7, last30, prev30, allTime };
+  }
+
+  async getLeaderboard(range: "daily" | "weekly" | "monthly" = "daily") {
+    const { startToday, startTomorrow } = this.getNairobiDayBounds();
+    const start =
+      range === "monthly"
+        ? this.shiftDays(startToday, -29)
+        : range === "weekly"
+        ? this.shiftDays(startToday, -6)
+        : startToday;
+
+    const rows = await this.paymentRepo
+      .createQueryBuilder("tx")
+      .select("tx.phoneNumber", "phoneNumber")
+      .addSelect("MAX(tx.payerName)", "payerName")
+      .addSelect("COUNT(*)", "count")
+      .addSelect("SUM(tx.amount)", "amount")
+      .where("tx.status IN (:...statuses)", { statuses: this.paidStatuses })
+      .andWhere("tx.createdAt >= :start", { start })
+      .andWhere("tx.createdAt < :end", { end: startTomorrow })
+      .groupBy("tx.phoneNumber")
+      .orderBy("amount", "DESC")
+      .limit(10)
+      .getRawMany();
+
+    return rows.map((row) => ({
+      phoneNumber: row.phoneNumber,
+      payerName: row.payerName || null,
+      count: Number(row.count ?? 0),
+      amount: Number(row.amount ?? 0),
+    }));
+  }
+
+  private async markSessionWon(
+    manager: DataSource["manager"],
+    sessionId: string | null,
+    amount: number
+  ) {
+    if (!sessionId) return;
+    const sessionRepo = manager.getRepository(UssdSession);
+    const session = await sessionRepo.findOne({ where: { sessionId } });
+    if (!session) return;
+    session.state = "WON";
+    session.wonAmount = amount;
+    await sessionRepo.save(session);
+  }
+
+  private async markSessionLost(
+    manager: DataSource["manager"],
+    sessionId: string | null
+  ) {
+    if (!sessionId) return;
+    const sessionRepo = manager.getRepository(UssdSession);
+    const session = await sessionRepo.findOne({ where: { sessionId } });
+    if (!session) return;
+    session.state = "LOST";
+    session.wonAmount = null;
+    await sessionRepo.save(session);
+  }
+
+  private getNairobiDayBounds() {
+    const now = new Date();
+    const tzOffsetMs = 3 * 60 * 60 * 1000; // Africa/Nairobi UTC+3
+    const nairobiNow = new Date(now.getTime() + tzOffsetMs);
+    const startNairobi = new Date(
+      nairobiNow.getFullYear(),
+      nairobiNow.getMonth(),
+      nairobiNow.getDate(),
+      0,
+      0,
+      0,
+      0
+    );
+    const endNairobi = new Date(startNairobi);
+    endNairobi.setDate(endNairobi.getDate() + 1);
+    const startUtc = new Date(startNairobi.getTime() - tzOffsetMs);
+    const endUtc = new Date(endNairobi.getTime() - tzOffsetMs);
+    return { startToday: startUtc, startTomorrow: endUtc };
+  }
+
+  private randomBetween(min: number, max: number) {
+    const safeMin = Math.ceil(min);
+    const safeMax = Math.floor(max);
+    if (safeMax <= safeMin) return safeMin;
+    return Math.floor(Math.random() * (safeMax - safeMin + 1)) + safeMin;
+  }
+
+  private async countAndSumPaid(start?: Date, end?: Date) {
+    const qb = this.paymentRepo
+      .createQueryBuilder("tx")
+      .select("COUNT(*)", "count")
+      .addSelect("SUM(tx.amount)", "amount")
+      .where("tx.status IN (:...statuses)", { statuses: this.paidStatuses });
+    if (start) {
+      qb.andWhere("tx.createdAt >= :start", { start });
+    }
+    if (end) {
+      qb.andWhere("tx.createdAt < :end", { end });
+    }
+    const row = await qb.getRawOne();
+    return {
+      count: Number(row?.count ?? 0),
+      amount: Number(row?.amount ?? 0),
+    };
+  }
+
+  private shiftDays(date: Date, days: number) {
+    const next = new Date(date);
+    next.setDate(next.getDate() + days);
+    return next;
+  }
+
+  private emitAnomalyAlertIfNeeded(outcome: any) {
+    if (!outcome?.ok) return;
+    const capAmount = Number(outcome.capAmount ?? 0);
+    const remainingBudget = Number(outcome.remainingBudget ?? 0);
+    if (!Number.isFinite(capAmount) || capAmount <= 0) return;
+
+    const used = Math.max(capAmount - remainingBudget, 0);
+    const usagePercent = (used / capAmount) * 100;
+    const warnThreshold = Number(
+      this.configService.get<number>("INSTANT_WIN_ALERT_THRESHOLD", 90)
+    );
+    const criticalThreshold = Number(
+      this.configService.get<number>("INSTANT_WIN_CRITICAL_THRESHOLD", 98)
+    );
+
+    const level =
+      usagePercent >= criticalThreshold
+        ? "critical"
+        : usagePercent >= warnThreshold
+        ? "warn"
+        : null;
+    if (!level) return;
+
+    const now = new Date();
+    const key = `${now.getUTCFullYear()}-${now.getUTCMonth()}-${now.getUTCDate()}-${level}`;
+    const bucket = Math.floor(usagePercent / 5) * 5;
+    const lastBucket = this.anomalyAlertBuckets.get(key) ?? -1;
+    if (bucket <= lastBucket) return;
+
+    this.anomalyAlertBuckets.set(key, bucket);
+    const message = JSON.stringify({
+      event: "instant_win_budget_alert",
+      level,
+      usagePercent: Math.round(usagePercent * 100) / 100,
+      capAmount,
+      remainingBudget,
+      won: Boolean(outcome.won),
+    });
+    if (level === "critical") {
+      this.logger.error(message);
+    } else {
+      this.logger.warn(message);
+    }
+  }
+
+  private async getInstantWinSettings(manager: DataSource["manager"]) {
+    const repo = manager.getRepository(InstantWinSettings);
+    const existing = await repo.findOne({ where: { id: 1 } });
+    if (existing) return existing;
+
+    const defaults = repo.create({
+      id: 1,
+      enabled: this.configService.get<boolean>("INSTANT_WIN_ENABLED", false),
+      maxPercentage: Number(
+        this.configService.get<number>("INSTANT_WIN_PERCENTAGE", 50)
+      ),
+      minAmount: Number(this.configService.get<number>("INSTANT_WIN_MIN_AMOUNT", 100)),
+      maxAmount: Number(this.configService.get<number>("INSTANT_WIN_MAX_AMOUNT", 1000)),
+      baseProbability: Number(
+        this.configService.get<number>("INSTANT_WIN_BASE_PROBABILITY", 0.1)
+      ),
+      loserMessage:
+        this.configService.get<string>("LOSER_MESSAGE") || "Almost won. Try again.",
+      sendWinnerMessages: this.configService.get<boolean>(
+        "SEND_WINNER_MESSAGES",
+        false
+      ),
+    });
+    return repo.save(defaults);
+  }
+
+  private async initiateB2CPayout(input: {
+    phoneNumber: string;
+    amount: number;
+    reference: string;
+  }) {
+    const baseUrl = this.configService.get<string>("MPESA_BASE_URL");
+    const shortcode =
+      this.configService.get<string>("MPESA_B2C_SHORTCODE") ||
+      this.configService.get<string>("MPESA_SHORTCODE");
+    const initiatorName = this.configService.get<string>("MPESA_B2C_INITIATOR_NAME");
+    const securityCredential =
+      this.configService.get<string>("MPESA_B2C_SECURITY_CREDENTIAL") ||
+      this.configService.get<string>("MPESA_SECURITY_KEY");
+    const commandId =
+      this.configService.get<string>("MPESA_B2C_COMMAND_ID") ||
+      "BusinessPayment";
+    const publicBaseUrl = this.configService.get<string>("PUBLIC_BASE_URL");
+    const resultUrl =
+      this.configService.get<string>("MPESA_B2C_RESULT_URL") ||
+      (publicBaseUrl ? `${publicBaseUrl}/payments/mpesa/b2c/result` : "");
+    const timeoutUrl =
+      this.configService.get<string>("MPESA_B2C_TIMEOUT_URL") ||
+      (publicBaseUrl ? `${publicBaseUrl}/payments/mpesa/b2c/timeout` : "");
+    const remarks =
+      this.configService.get<string>("MPESA_B2C_REMARKS") || "Lucky Box instant payout";
+    const occasion = this.configService.get<string>("MPESA_B2C_OCCASION") || "InstantWin";
+
+    if (
+      !baseUrl ||
+      !shortcode ||
+      !initiatorName ||
+      !securityCredential ||
+      !resultUrl ||
+      !timeoutUrl
+    ) {
+      this.logger.warn(
+        "Skipping B2C payout: missing MPESA B2C configuration (baseUrl/shortcode/initiator/securityCredential/resultUrl/timeoutUrl)"
+      );
+      return { queued: false, reason: "B2C not configured" };
+    }
+
+    const token = await this.mpesaTokenService.getAccessToken();
+    const payload = {
+      InitiatorName: initiatorName,
+      SecurityCredential: securityCredential,
+      CommandID: commandId,
+      Amount: Math.round(Number(input.amount)),
+      PartyA: shortcode,
+      PartyB: this.normalizePhone(input.phoneNumber),
+      Remarks: remarks,
+      QueueTimeOutURL: timeoutUrl,
+      ResultURL: resultUrl,
+      Occasion: occasion,
+    };
+
+    const response = await axios.post(
+      `${baseUrl}/mpesa/b2c/v1/paymentrequest`,
+      payload,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        timeout: 15000,
+      }
+    );
+
+    this.logger.log(
+      JSON.stringify({
+        event: "mpesa_b2c_request_queued",
+        reference: input.reference,
+        phoneNumber: this.normalizePhone(input.phoneNumber),
+        amount: Math.round(Number(input.amount)),
+        response: response.data,
+      })
+    );
+
+    return response.data;
+  }
+
+  private normalizePhone(phone: string) {
+    const cleaned = String(phone || "").replace(/\D/g, "");
+    if (cleaned.startsWith("254")) return cleaned;
+    if (cleaned.startsWith("0")) return `254${cleaned.slice(1)}`;
+    return cleaned;
   }
 }
