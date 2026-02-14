@@ -1,21 +1,21 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
-import { AuthModule } from "./modules/auth/auth.module";
-import { UssdModule } from "./modules/ussd/ussd.module";
-import { PaymentsModule } from "./modules/payments/payments.module";
-import { PayoutsModule } from "./modules/payouts/payouts.module";
-import { AnalyticsModule } from "./modules/analytics/analytics.module";
 import { AdminModule } from "./modules/admin/admin.module";
-import { PlayerModule } from "./modules/player/player.module";
+import { AnalyticsModule } from "./modules/analytics/analytics.module";
+import { AuthModule } from "./modules/auth/auth.module";
 import { AdminUser } from "./modules/auth/entities/admin-user.entity";
 import { OtpCode } from "./modules/auth/entities/otp-code.entity";
-import { UssdSession } from "./modules/ussd/entities/ussd-session.entity";
-import { PaymentTransaction } from "./modules/payments/entities/payment-transaction.entity";
-import { PayoutRelease } from "./modules/payouts/entities/payout-release.entity";
-import { Winner } from "./modules/payouts/entities/winner.entity";
-import { Player } from "./modules/player/entities/player.entity";
 import { InstantWinSettings } from "./modules/admin/entities/instant-win-settings.entity";
+import { PaymentTransaction } from "./modules/payments/entities/payment-transaction.entity";
+import { PaymentsModule } from "./modules/payments/payments.module";
+import { Winner } from "./modules/payouts/entities/winner.entity";
+import { PayoutRelease } from "./modules/payouts/entities/payout-release.entity";
+import { PayoutsModule } from "./modules/payouts/payouts.module";
+import { Player } from "./modules/player/entities/player.entity";
+import { PlayerModule } from "./modules/player/player.module";
+import { UssdSession } from "./modules/ussd/entities/ussd-session.entity";
+import { UssdModule } from "./modules/ussd/ussd.module";
 
 @Module({
   imports: [
@@ -26,9 +26,10 @@ import { InstantWinSettings } from "./modules/admin/entities/instant-win-setting
         type: "mariadb",
         host: config.get<string>("DB_HOST", "localhost"),
         port: config.get<number>("DB_PORT", 3306),
-        username: config.get<string>("DB_USERNAME", "luckyuser"),
-        password: config.get<string>("DB_PASSWORD", "willrocks"),
-        database: config.get<string>("DB_NAME", "luckybox"),
+        // Defaults match `docs/setup.md` for a smooth local bootstrap.
+        username: config.get<string>("DB_USERNAME", "guzabox"),
+        password: config.get<string>("DB_PASSWORD", "pass"),
+        database: config.get<string>("DB_NAME", "jazabox"),
         entities: [
           AdminUser,
           OtpCode,
@@ -53,3 +54,4 @@ import { InstantWinSettings } from "./modules/admin/entities/instant-win-setting
   ],
 })
 export class AppModule {}
+

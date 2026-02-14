@@ -16,9 +16,10 @@ export const AppDataSource = new DataSource({
   type: "mariadb",
   host: process.env.DB_HOST || "localhost",
   port: parseInt(process.env.DB_PORT || "3306"),
-  username: process.env.DB_USERNAME || "luckyuser",
-  password: process.env.DB_PASSWORD || "willrocks",
-  database: process.env.DB_NAME || "luckybox",
+  // Defaults match `docs/setup.md` for a smooth local bootstrap.
+  username: process.env.DB_USERNAME || "guzabox",
+  password: process.env.DB_PASSWORD || "pass",
+  database: process.env.DB_NAME || "jazabox",
   entities: [
     AdminUser,
     OtpCode,
