@@ -13,6 +13,7 @@ Chagua Box yako ya Ushindi
 3. Box 3
 4. Box 4
 5. Box 5
+6. Box 6
 `;
 
 @Injectable()
@@ -42,7 +43,7 @@ export class UssdNewService {
 
     if (session.state === "START") {
       const choice = text.trim();
-      if (!["1", "2", "3", "4", "5"].includes(choice)) {
+      if (!["1", "2", "3", "4", "5", "6"].includes(choice)) {
         return `CON ${MENU_TEXT}\nInvalid choice. Try again.`;
       }
 

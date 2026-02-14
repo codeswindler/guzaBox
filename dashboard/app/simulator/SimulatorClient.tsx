@@ -13,7 +13,8 @@ Chagua Box yako ya Ushindi
 2. Box 2
 3. Box 3
 4. Box 4
-5. Box 5`;
+5. Box 5
+6. Box 6`;
   const sessionId = useMemo(
     () => `sim-${Math.random().toString(36).slice(2, 10)}`,
     []
@@ -101,7 +102,7 @@ Chagua Box yako ya Ushindi
 
   const simulateSelection = (choiceRaw: string) => {
     const choice = choiceRaw.trim();
-    if (!["1", "2", "3", "4", "5"].includes(choice)) {
+    if (!["1", "2", "3", "4", "5", "6"].includes(choice)) {
       const response = `CON ${menuText}\nInvalid choice. Try again.`;
       setHistory((prev) => [...prev, `> ${choice}`, response]);
       setScreenText(response);
@@ -116,18 +117,39 @@ Chagua Box yako ya Ushindi
     // Populate boxes with a mix of losing and enticing values; selected is always losing (0).
     // Ensure at least 1-2 *additional* losing boxes to make the SMS feel realistic.
     const boxResults: Record<number, number> = {};
-    const otherBoxes = [1, 2, 3, 4, 5].filter((b) => b !== selectedBox);
-    // Exactly 2 losing boxes total (chosen + one other), and 3 winning boxes.
-    const extraLosingCount = 1;
-    const extraLosingBoxes = new Set<number>();
-    while (extraLosingBoxes.size < extraLosingCount) {
-      const notAdjacent = otherBoxes.filter((b) => Math.abs(b - selectedBox) > 1);
-      const pickFrom = notAdjacent.length > 0 ? notAdjacent : otherBoxes;
-      extraLosingBoxes.add(pickFrom[randomInt(0, pickFrom.length - 1)]);
+    const boxCount = 6;
+
+    // Randomize total losing boxes: 2 or 3 (inclusive of selected box).
+    const loserTarget = randomInt(2, 3);
+    const loserBoxes = new Set<number>([selectedBox]);
+
+    const isAdjacentToAnyLoser = (box: number) => {
+      for (const loser of loserBoxes) {
+        if (Math.abs(loser - box) <= 1) return true;
+      }
+      return false;
+    };
+
+    const candidates = Array.from({ length: boxCount }, (_, idx) => idx + 1).filter(
+      (b) => b !== selectedBox
+    );
+    const shuffled = candidates.sort(() => Math.random() - 0.5);
+
+    for (const b of shuffled) {
+      if (loserBoxes.size >= loserTarget) break;
+      if (isAdjacentToAnyLoser(b)) continue;
+      loserBoxes.add(b);
     }
 
-    for (let i = 1; i <= 5; i++) {
-      if (i === selectedBox || extraLosingBoxes.has(i)) {
+    if (loserBoxes.size < loserTarget) {
+      for (const b of shuffled) {
+        if (loserBoxes.size >= loserTarget) break;
+        loserBoxes.add(b);
+      }
+    }
+
+    for (let i = 1; i <= boxCount; i++) {
+      if (loserBoxes.has(i)) {
         boxResults[i] = 0;
       } else {
         boxResults[i] = [50, 100, 200, 500][randomInt(0, 3)];
@@ -225,7 +247,7 @@ Chagua Box yako ya Ushindi
               <li>
                 Dial <span className="pill">{dialText}</span> on the simulator
               </li>
-              <li>Navigate using keypad (Option 1 - 5)</li>
+              <li>Navigate using keypad (Option 1 - 6)</li>
               <li>After selection, payment + SMS are simulated locally</li>
               <li>Simulation does not write to transactions</li>
             </ol>

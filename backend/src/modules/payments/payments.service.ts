@@ -525,7 +525,7 @@ export class PaymentsService {
 
     const results = this.generateBoxResults({
       selectedBox: selectedBoxNum,
-      boxCount: 5,
+      boxCount: 6,
       forceLose: true,
     });
 
@@ -555,27 +555,38 @@ export class PaymentsService {
     const candidateBoxes = Array.from({ length: count }, (_, idx) => idx + 1);
     const shuffled = candidateBoxes.sort(() => Math.random() - 0.5);
 
-    if (opts.forceLose && count >= 5) {
-      // For the 5-box game: exactly 2 losing boxes (including the chosen one),
-      // and 3 winning boxes so the SMS shows clear "you nearly won" alternatives.
+    if (opts.forceLose && count >= 6) {
+      // 6-box game: randomize 2 or 3 losing boxes (0 values), inclusive of the chosen box.
+      // Also ensure the losing boxes are not adjacent to each other.
+      const loserTarget = Math.random() < 0.5 ? 2 : 3;
       const loserBoxes = new Set<number>([selected]);
 
-      // Pick the extra losing box such that the two zeros don't follow each other.
-      const notAdjacent = shuffled.filter(
-        (b) => b !== selected && Math.abs(b - selected) > 1
-      );
-      const fallback = shuffled.filter((b) => b !== selected);
-      const pool = notAdjacent.length > 0 ? notAdjacent : fallback;
-      const extraLoser =
-        pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : null;
-      if (extraLoser) loserBoxes.add(extraLoser);
+      const isAdjacentToAnyLoser = (box: number) => {
+        for (const loser of loserBoxes) {
+          if (Math.abs(loser - box) <= 1) return true;
+        }
+        return false;
+      };
+
+      // Candidate boxes in random order; we prefer non-adjacent picks.
+      for (const b of shuffled) {
+        if (loserBoxes.size >= loserTarget) break;
+        if (b === selected) continue;
+        if (isAdjacentToAnyLoser(b)) continue;
+        loserBoxes.add(b);
+      }
+
+      // Fallback (should be rare for 6 boxes): if still short, fill from any non-selected box.
+      if (loserBoxes.size < loserTarget) {
+        for (const b of shuffled) {
+          if (loserBoxes.size >= loserTarget) break;
+          if (b === selected) continue;
+          loserBoxes.add(b);
+        }
+      }
 
       for (let i = 1; i <= count; i++) {
-        if (loserBoxes.has(i)) {
-          results[i] = 0;
-        } else {
-          results[i] = this.randomBetween(50, 9999);
-        }
+        results[i] = loserBoxes.has(i) ? 0 : this.randomBetween(50, 9999);
       }
     } else {
       // Generic fallback: ensure at least one winning box. If forceLose, ensure it's not the selected box.

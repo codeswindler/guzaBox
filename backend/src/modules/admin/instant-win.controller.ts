@@ -187,8 +187,8 @@ export class InstantWinController {
     if (!phoneNumber) {
       return { ok: false, message: "phoneNumber is required" };
     }
-    if (!Number.isFinite(selectedBox) || selectedBox < 1 || selectedBox > 5) {
-      return { ok: false, message: "selectedBox must be between 1 and 5" };
+    if (!Number.isFinite(selectedBox) || selectedBox < 1 || selectedBox > 6) {
+      return { ok: false, message: "selectedBox must be between 1 and 6" };
     }
 
     const settings = await this.getSettings();
@@ -196,7 +196,7 @@ export class InstantWinController {
 
     const boxResults = this.generateBoxResults({
       selectedBox,
-      boxCount: 5,
+      boxCount: 6,
       forceLose: true,
     });
 
@@ -259,25 +259,36 @@ export class InstantWinController {
     const randomBetween = (min: number, max: number) =>
       Math.floor(min + Math.random() * (max - min + 1));
 
-    if (opts.forceLose && count >= 5) {
+    if (opts.forceLose && count >= 6) {
+      // 6-box game: randomize 2 or 3 losing boxes (0 values), inclusive of the chosen box.
+      // Also ensure the losing boxes are not adjacent to each other.
+      const loserTarget = Math.random() < 0.5 ? 2 : 3;
       const loserBoxes = new Set<number>([selected]);
 
-      // Pick the extra losing box such that the two zeros don't follow each other.
-      const notAdjacent = shuffled.filter(
-        (b) => b !== selected && Math.abs(b - selected) > 1
-      );
-      const fallback = shuffled.filter((b) => b !== selected);
-      const pool = notAdjacent.length > 0 ? notAdjacent : fallback;
-      const extraLoser =
-        pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : null;
-      if (extraLoser) loserBoxes.add(extraLoser);
+      const isAdjacentToAnyLoser = (box: number) => {
+        for (const loser of loserBoxes) {
+          if (Math.abs(loser - box) <= 1) return true;
+        }
+        return false;
+      };
+
+      for (const b of shuffled) {
+        if (loserBoxes.size >= loserTarget) break;
+        if (b === selected) continue;
+        if (isAdjacentToAnyLoser(b)) continue;
+        loserBoxes.add(b);
+      }
+
+      if (loserBoxes.size < loserTarget) {
+        for (const b of shuffled) {
+          if (loserBoxes.size >= loserTarget) break;
+          if (b === selected) continue;
+          loserBoxes.add(b);
+        }
+      }
 
       for (let i = 1; i <= count; i++) {
-        if (loserBoxes.has(i)) {
-          results[i] = 0;
-        } else {
-          results[i] = randomBetween(50, 9999);
-        }
+        results[i] = loserBoxes.has(i) ? 0 : randomBetween(50, 9999);
       }
     } else {
       const winnersTarget = Math.random() > 0.7 ? 2 : 1;
