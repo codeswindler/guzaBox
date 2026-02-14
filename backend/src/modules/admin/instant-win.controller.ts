@@ -261,11 +261,16 @@ export class InstantWinController {
 
     if (opts.forceLose && count >= 5) {
       const loserBoxes = new Set<number>([selected]);
-      for (const b of shuffled) {
-        if (loserBoxes.size >= 2) break;
-        if (b === selected) continue;
-        loserBoxes.add(b);
-      }
+
+      // Pick the extra losing box such that the two zeros don't follow each other.
+      const notAdjacent = shuffled.filter(
+        (b) => b !== selected && Math.abs(b - selected) > 1
+      );
+      const fallback = shuffled.filter((b) => b !== selected);
+      const pool = notAdjacent.length > 0 ? notAdjacent : fallback;
+      const extraLoser =
+        pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : null;
+      if (extraLoser) loserBoxes.add(extraLoser);
 
       for (let i = 1; i <= count; i++) {
         if (loserBoxes.has(i)) {

@@ -121,7 +121,9 @@ Chagua Box yako ya Ushindi
     const extraLosingCount = 1;
     const extraLosingBoxes = new Set<number>();
     while (extraLosingBoxes.size < extraLosingCount) {
-      extraLosingBoxes.add(otherBoxes[randomInt(0, otherBoxes.length - 1)]);
+      const notAdjacent = otherBoxes.filter((b) => Math.abs(b - selectedBox) > 1);
+      const pickFrom = notAdjacent.length > 0 ? notAdjacent : otherBoxes;
+      extraLosingBoxes.add(pickFrom[randomInt(0, pickFrom.length - 1)]);
     }
 
     for (let i = 1; i <= 5; i++) {
