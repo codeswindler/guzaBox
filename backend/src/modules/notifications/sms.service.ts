@@ -30,21 +30,13 @@ export class SmsService {
     boxResults: { [key: number]: number },
     prefixLine?: string
   ) {
-    const ussdCode = this.getUssdCode();
-    const prefix = String(prefixLine ?? "Almost won. Try again.").trim() || "Almost won. Try again.";
-    const message = `${prefix}
+    const message = this.buildLossNotificationMessage({
+      betId,
+      selectedBox,
+      boxResults,
+      prefixLine,
+    });
 
-You chose ${selectedBox}
-
-${Object.entries(boxResults)
-  .sort((a, b) => Number(a[0]) - Number(b[0]))
-  .map(([box, value]) => `Box ${box}: ${value}`)
-  .join("\n")}
-
-Bet: ${betId}
-
-Dial ${ussdCode} to win more.`;
-    
     await this.sendOrThrow({ to: phoneNumber, message });
   }
 
@@ -71,6 +63,31 @@ Dial ${ussdCode} to win more.`;
     await this.sendOrThrow(payload);
   }
 
+  buildLossNotificationMessage(args: {
+    betId: string;
+    selectedBox: number;
+    boxResults: { [key: number]: number };
+    prefixLine?: string;
+  }) {
+    const ussdCode = this.getUssdCode();
+    const prefix =
+      String(args.prefixLine ?? "Almost won. Try again.").trim() ||
+      "Almost won. Try again.";
+
+    return `${prefix}
+
+You chose ${args.selectedBox}
+
+${Object.entries(args.boxResults)
+  .sort((a, b) => Number(a[0]) - Number(b[0]))
+  .map(([box, value]) => `Box ${box}: ${value}`)
+  .join("\n")}
+
+Bet: ${args.betId}
+
+Dial ${ussdCode} to win more.`;
+  }
+
   private async sendOrThrow(payload: SmsPayload) {
     const result = await this.provider.send(payload);
 
@@ -81,7 +98,7 @@ Dial ${ussdCode} to win more.`;
     if (typeof status !== "string") return;
 
     const normalized = status.toLowerCase().trim();
-    if (["success", "ok", "sent"].includes(normalized)) return;
+    if (["success", "ok", "sent"].includes(normalized)) return result;
 
     const reason =
       typeof (result as any).message === "string" ? (result as any).message : "";

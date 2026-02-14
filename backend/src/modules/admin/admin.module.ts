@@ -11,10 +11,12 @@ import { Winner } from "../payouts/entities/winner.entity";
 import { UssdSession } from "../ussd/entities/ussd-session.entity";
 import { InstantWinSettings } from "./entities/instant-win-settings.entity";
 import { PaymentsModule } from "../payments/payments.module";
+import { NotificationsModule } from "../notifications/notifications.module";
 
 @Module({
   imports: [
     PaymentsModule,
+    NotificationsModule,
     TypeOrmModule.forFeature([
       PaymentTransaction,
       PayoutRelease,

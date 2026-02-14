@@ -7,12 +7,14 @@ import { Winner } from "../payouts/entities/winner.entity";
 import { PaymentsService } from "../payments/payments.service";
 import { InstantWinSettings } from "./entities/instant-win-settings.entity";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { SmsService } from "../notifications/sms.service";
 
 @Controller("admin")
 export class InstantWinController {
   constructor(
     private readonly configService: ConfigService,
     private readonly paymentsService: PaymentsService,
+    private readonly smsService: SmsService,
     @InjectRepository(PaymentTransaction)
     private paymentRepo: Repository<PaymentTransaction>,
     @InjectRepository(Winner)
@@ -166,6 +168,114 @@ export class InstantWinController {
     }
 
     return this.paymentsService.initiateTestB2CPayout({ phoneNumber, amount });
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post("instant-win/test-loss-sms")
+  async testLossSms(
+    @Body()
+    body: {
+      phoneNumber?: string;
+      selectedBox?: number;
+      betId?: string;
+    }
+  ) {
+    const phoneNumber = String(body.phoneNumber ?? "").trim();
+    const selectedBox = Number(body.selectedBox ?? 1);
+    const betId = String(body.betId ?? this.generateBetId()).trim();
+
+    if (!phoneNumber) {
+      return { ok: false, message: "phoneNumber is required" };
+    }
+    if (!Number.isFinite(selectedBox) || selectedBox < 1 || selectedBox > 5) {
+      return { ok: false, message: "selectedBox must be between 1 and 5" };
+    }
+
+    const settings = await this.getSettings();
+    const loserMessage = settings.loserMessage || "Almost won. Try again.";
+
+    const boxResults = this.generateBoxResults({
+      selectedBox,
+      boxCount: 5,
+      forceLose: true,
+    });
+
+    const message = this.smsService.buildLossNotificationMessage({
+      betId,
+      selectedBox,
+      boxResults,
+      prefixLine: loserMessage,
+    });
+
+    try {
+      const providerResult = await this.smsService.send({ to: phoneNumber, message });
+      return {
+        ok: true,
+        sent: true,
+        phoneNumber,
+        selectedBox,
+        betId,
+        boxResults,
+        message,
+        providerResult: providerResult ?? null,
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        sent: false,
+        phoneNumber,
+        selectedBox,
+        betId,
+        boxResults,
+        message,
+        error: (error as Error).message,
+      };
+    }
+  }
+
+  private generateBetId(): string {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let result = "";
+    for (let i = 0; i < 8; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return `Z1o${result}`;
+  }
+
+  private generateBoxResults(opts: {
+    selectedBox: number;
+    boxCount: number;
+    forceLose: boolean;
+  }) {
+    const count = Math.max(2, Math.min(opts.boxCount, 20));
+    const selected = Math.max(1, Math.min(opts.selectedBox, count));
+
+    const winnersTarget = Math.random() > 0.7 ? 2 : 1;
+    const results: { [key: number]: number } = {};
+    for (let i = 1; i <= count; i++) results[i] = 0;
+
+    const candidateBoxes = Array.from({ length: count }, (_, idx) => idx + 1);
+    const shuffled = candidateBoxes.sort(() => Math.random() - 0.5);
+    const winnerBoxes: number[] = [];
+
+    for (const b of shuffled) {
+      if (winnerBoxes.length >= winnersTarget) break;
+      if (opts.forceLose && b === selected) continue;
+      winnerBoxes.push(b);
+    }
+    if (winnerBoxes.length === 0) {
+      winnerBoxes.push(selected === 1 ? 2 : 1);
+    }
+
+    const randomBetween = (min: number, max: number) =>
+      Math.floor(min + Math.random() * (max - min + 1));
+
+    for (const b of winnerBoxes) {
+      results[b] = randomBetween(50, 9999);
+    }
+    if (opts.forceLose) results[selected] = 0;
+
+    return results;
   }
 
   private getNairobiDayBounds() {

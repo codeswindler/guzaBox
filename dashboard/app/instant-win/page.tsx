@@ -147,6 +147,12 @@ export default function InstantWinPage() {
   const [testB2cResult, setTestB2cResult] = useState("");
   const [testB2cError, setTestB2cError] = useState("");
 
+  const [testLossPhone, setTestLossPhone] = useState("");
+  const [testLossBox, setTestLossBox] = useState<number>(1);
+  const [testLossLoading, setTestLossLoading] = useState(false);
+  const [testLossResult, setTestLossResult] = useState("");
+  const [testLossError, setTestLossError] = useState("");
+
   const [settings, setSettings] = useState({
     baseProbability: 0.1,
     maxPercentage: 10,
@@ -230,6 +236,42 @@ export default function InstantWinPage() {
       );
     } finally {
       setTestB2cLoading(false);
+    }
+  };
+
+  const testLossSms = async () => {
+    setTestLossLoading(true);
+    setTestLossError("");
+    setTestLossResult("");
+
+    const phoneNumber = testLossPhone.trim();
+    const selectedBox = Number(testLossBox);
+
+    if (!phoneNumber) {
+      setTestLossError("Phone number is required");
+      setTestLossLoading(false);
+      return;
+    }
+    if (!Number.isFinite(selectedBox) || selectedBox < 1 || selectedBox > 5) {
+      setTestLossError("Selected box must be between 1 and 5");
+      setTestLossLoading(false);
+      return;
+    }
+
+    try {
+      const res = await api.post("/admin/instant-win/test-loss-sms", {
+        phoneNumber,
+        selectedBox,
+      });
+      setTestLossResult(JSON.stringify(res.data, null, 2));
+    } catch (err: any) {
+      setTestLossError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Failed to send test loss SMS"
+      );
+    } finally {
+      setTestLossLoading(false);
     }
   };
 
@@ -547,6 +589,84 @@ export default function InstantWinPage() {
                 }}
               >
                 {testB2cResult}
+              </pre>
+            )}
+          </div>
+
+          {/* Manual Loss SMS Test */}
+          <div className="card demo-card">
+            <h3>Test Loss SMS (Manual)</h3>
+            <p className="subtle">
+              Sends a real loss SMS using your configured SMS gateway. This helps you
+              confirm delivery and see the exact player message (prefix + dynamic box results).
+            </p>
+            <p className="subtle" style={{ color: "#b45309" }}>
+              Tip: this will spend SMS credits if your provider is live.
+            </p>
+
+            {testLossError && (
+              <p className="subtle" style={{ color: "red" }}>
+                {testLossError}
+              </p>
+            )}
+
+            <div className="input-row">
+              <label>Phone Number</label>
+              <input
+                type="text"
+                placeholder="2547XXXXXXXX"
+                value={testLossPhone}
+                onChange={(e) => setTestLossPhone(e.target.value)}
+              />
+              <span className="subtle">
+                Tip: use 2547xxxxxxxx format (or 07xxxxxxxx; system normalizes).
+              </span>
+            </div>
+
+            <div className="input-row">
+              <label>Selected Box</label>
+              <input
+                type="number"
+                min="1"
+                max="5"
+                step="1"
+                value={testLossBox}
+                onChange={(e) => setTestLossBox(Number(e.target.value))}
+              />
+              <span className="subtle">
+                Tip: we generate randomized box results but force this box to lose.
+              </span>
+            </div>
+
+            <button
+              onClick={testLossSms}
+              disabled={testLossLoading}
+              style={{
+                backgroundColor: "#111827",
+                color: "white",
+                padding: "12px 24px",
+                border: "none",
+                borderRadius: "8px",
+                fontSize: "16px",
+                cursor: testLossLoading ? "not-allowed" : "pointer",
+                opacity: testLossLoading ? 0.7 : 1,
+                marginTop: "12px",
+              }}
+            >
+              {testLossLoading ? "Sending..." : "SEND TEST LOSS SMS"}
+            </button>
+
+            {testLossResult && (
+              <pre
+                style={{
+                  marginTop: "12px",
+                  padding: "12px",
+                  borderRadius: "8px",
+                  background: "rgba(0,0,0,0.08)",
+                  overflowX: "auto",
+                }}
+              >
+                {testLossResult}
               </pre>
             )}
           </div>

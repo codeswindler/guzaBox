@@ -46,6 +46,7 @@ export class AdvantaSmsService {
         };
       }
 
+      const sendUrl = `${this.baseUrl}/send`;
       const requestData = {
         partnerId: this.partnerId,
         apiKey: this.apiKey,
@@ -58,6 +59,8 @@ export class AdvantaSmsService {
         "Sending SMS via Advanta",
         JSON.stringify(
           {
+            baseUrl: this.baseUrl,
+            url: sendUrl,
             partnerId: this.partnerId,
             shortcode: this.shortcode,
             mobile: requestData.mobile,
@@ -69,7 +72,7 @@ export class AdvantaSmsService {
       );
 
       const response = await axios.post(
-        `${this.baseUrl}/send`,
+        sendUrl,
         requestData,
         {
           headers: {
@@ -98,6 +101,7 @@ export class AdvantaSmsService {
     } catch (error: any) {
       console.error(`SMS service error:`, {
         message: error.message,
+        baseUrl: this.baseUrl,
         response: error.response?.data,
         status: error.response?.status,
       });
