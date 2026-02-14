@@ -141,6 +141,11 @@ export default function InstantWinPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [testB2cPhone, setTestB2cPhone] = useState("");
+  const [testB2cAmount, setTestB2cAmount] = useState<number>(10);
+  const [testB2cLoading, setTestB2cLoading] = useState(false);
+  const [testB2cResult, setTestB2cResult] = useState("");
+  const [testB2cError, setTestB2cError] = useState("");
 
   const [settings, setSettings] = useState({
     baseProbability: 0.1,
@@ -189,6 +194,42 @@ export default function InstantWinPage() {
       setError(err?.response?.data?.message || "Failed to update settings");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const testB2c = async () => {
+    setTestB2cLoading(true);
+    setTestB2cError("");
+    setTestB2cResult("");
+
+    const phoneNumber = testB2cPhone.trim();
+    const amount = Number(testB2cAmount);
+
+    if (!phoneNumber) {
+      setTestB2cError("Phone number is required");
+      setTestB2cLoading(false);
+      return;
+    }
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setTestB2cError("Amount must be a positive number");
+      setTestB2cLoading(false);
+      return;
+    }
+
+    try {
+      const res = await api.post("/admin/instant-win/test-b2c", {
+        phoneNumber,
+        amount,
+      });
+      setTestB2cResult(JSON.stringify(res.data, null, 2));
+    } catch (err: any) {
+      setTestB2cError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Failed to initiate test B2C payout"
+      );
+    } finally {
+      setTestB2cLoading(false);
     }
   };
 
@@ -382,7 +423,7 @@ export default function InstantWinPage() {
             </div>
 
             <div className="input-row">
-              <label>Loser Message</label>
+              <label>Loser Message (Prefix)</label>
               <input
                 type="text"
                 maxLength={500}
@@ -392,8 +433,8 @@ export default function InstantWinPage() {
                 }
               />
               <span className="subtle">
-                Tip: message sent when player does not win. Use clear, friendly
-                text that encourages replay.
+                Tip: first line only. The system appends dynamic details (chosen
+                box, box results, bet id, and dial code).
               </span>
             </div>
 
@@ -433,6 +474,81 @@ export default function InstantWinPage() {
             >
               {loading ? "Updating..." : "UPDATE SETTINGS"}
             </button>
+          </div>
+
+          {/* Manual B2C Test */}
+          <div className="card demo-card">
+            <h3>Test B2C (Manual Payout)</h3>
+            <p className="subtle">
+              Sends a manual B2C payout using your configured M-Pesa B2C env
+              variables. Use a small amount and a test number.
+            </p>
+
+            {testB2cError && (
+              <p className="subtle" style={{ color: "red" }}>
+                {testB2cError}
+              </p>
+            )}
+
+            <div className="input-row">
+              <label>Phone Number</label>
+              <input
+                type="text"
+                placeholder="2547XXXXXXXX"
+                value={testB2cPhone}
+                onChange={(e) => setTestB2cPhone(e.target.value)}
+              />
+              <span className="subtle">
+                Tip: use 2547xxxxxxxx format (or 07xxxxxxxx; system normalizes).
+              </span>
+            </div>
+
+            <div className="input-row">
+              <label>Amount (KES)</label>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={testB2cAmount}
+                onChange={(e) => setTestB2cAmount(Number(e.target.value))}
+              />
+              <span className="subtle">
+                Tip: keep it small during testing. The backend caps test payouts
+                at 20,000.
+              </span>
+            </div>
+
+            <button
+              onClick={testB2c}
+              disabled={testB2cLoading}
+              style={{
+                backgroundColor: "#111827",
+                color: "white",
+                padding: "12px 24px",
+                border: "none",
+                borderRadius: "8px",
+                fontSize: "16px",
+                cursor: testB2cLoading ? "not-allowed" : "pointer",
+                opacity: testB2cLoading ? 0.7 : 1,
+                marginTop: "12px",
+              }}
+            >
+              {testB2cLoading ? "Sending..." : "SEND TEST B2C"}
+            </button>
+
+            {testB2cResult && (
+              <pre
+                style={{
+                  marginTop: "12px",
+                  padding: "12px",
+                  borderRadius: "8px",
+                  background: "rgba(0,0,0,0.08)",
+                  overflowX: "auto",
+                }}
+              >
+                {testB2cResult}
+              </pre>
+            )}
           </div>
 
           {/* Real-time Stats */}

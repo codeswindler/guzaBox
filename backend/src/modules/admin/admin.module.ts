@@ -10,9 +10,11 @@ import { PayoutRelease } from "../payouts/entities/payout-release.entity";
 import { Winner } from "../payouts/entities/winner.entity";
 import { UssdSession } from "../ussd/entities/ussd-session.entity";
 import { InstantWinSettings } from "./entities/instant-win-settings.entity";
+import { PaymentsModule } from "../payments/payments.module";
 
 @Module({
   imports: [
+    PaymentsModule,
     TypeOrmModule.forFeature([
       PaymentTransaction,
       PayoutRelease,

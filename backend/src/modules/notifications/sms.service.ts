@@ -23,9 +23,16 @@ export class SmsService {
     await this.provider.send({ to: phoneNumber, message });
   }
 
-  async sendLossNotification(phoneNumber: string, betId: string, selectedBox: number, boxResults: { [key: number]: number }) {
+  async sendLossNotification(
+    phoneNumber: string,
+    betId: string,
+    selectedBox: number,
+    boxResults: { [key: number]: number },
+    prefixLine?: string
+  ) {
     const ussdCode = this.getUssdCode();
-    const message = `Almost won. Try again.
+    const prefix = String(prefixLine ?? "Almost won. Try again.").trim() || "Almost won. Try again.";
+    const message = `${prefix}
 
 You chose ${selectedBox}
 

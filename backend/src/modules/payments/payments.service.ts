@@ -367,7 +367,10 @@ export class PaymentsService {
         try {
           // Prefer the richer "game style" loser SMS (chosen box + box results + betId),
           // falling back to the configured loserMessage if we can't resolve session context.
-          const sent = await this.trySendLossSmsWithBoxResults(transaction);
+          const sent = await this.trySendLossSmsWithBoxResults(
+            transaction,
+            loserMessage
+          );
           if (!sent) {
             await this.smsService.send({
               to: transaction.phoneNumber,
@@ -504,7 +507,10 @@ export class PaymentsService {
     await sessionRepo.save(session);
   }
 
-  private async trySendLossSmsWithBoxResults(transaction: PaymentTransaction) {
+  private async trySendLossSmsWithBoxResults(
+    transaction: PaymentTransaction,
+    prefixLine: string
+  ) {
     if (!transaction.phoneNumber || !transaction.sessionId) return false;
 
     const session = await this.sessionRepo.findOne({
@@ -527,7 +533,8 @@ export class PaymentsService {
       transaction.phoneNumber,
       session.betId,
       selectedBoxNum,
-      results
+      results,
+      prefixLine
     );
     return true;
   }
@@ -773,6 +780,55 @@ export class PaymentsService {
     );
 
     return response.data;
+  }
+
+  async initiateTestB2CPayout(input: { phoneNumber: string; amount: number }) {
+    const missing: string[] = [];
+    const baseUrl = this.configService.get<string>("MPESA_BASE_URL");
+    const shortcode =
+      this.configService.get<string>("MPESA_B2C_SHORTCODE") ||
+      this.configService.get<string>("MPESA_SHORTCODE");
+    const initiatorName = this.configService.get<string>(
+      "MPESA_B2C_INITIATOR_NAME"
+    );
+    const securityCredential =
+      this.configService.get<string>("MPESA_B2C_SECURITY_CREDENTIAL") ||
+      this.configService.get<string>("MPESA_SECURITY_KEY");
+    const publicBaseUrl = this.configService.get<string>("PUBLIC_BASE_URL");
+    const resultUrl =
+      this.configService.get<string>("MPESA_B2C_RESULT_URL") ||
+      (publicBaseUrl ? `${publicBaseUrl}/payments/mpesa/b2c/result` : "");
+    const timeoutUrl =
+      this.configService.get<string>("MPESA_B2C_TIMEOUT_URL") ||
+      (publicBaseUrl ? `${publicBaseUrl}/payments/mpesa/b2c/timeout` : "");
+
+    if (!baseUrl) missing.push("MPESA_BASE_URL");
+    if (!shortcode) missing.push("MPESA_B2C_SHORTCODE (or MPESA_SHORTCODE)");
+    if (!initiatorName) missing.push("MPESA_B2C_INITIATOR_NAME");
+    if (!securityCredential)
+      missing.push("MPESA_B2C_SECURITY_CREDENTIAL (or MPESA_SECURITY_KEY)");
+    if (!resultUrl) missing.push("MPESA_B2C_RESULT_URL (or PUBLIC_BASE_URL)");
+    if (!timeoutUrl) missing.push("MPESA_B2C_TIMEOUT_URL (or PUBLIC_BASE_URL)");
+
+    if (missing.length) {
+      return { ok: false, queued: false, reason: "B2C not configured", missing };
+    }
+
+    const reference = `TEST_B2C_${Date.now()}`;
+    const response = await this.initiateB2CPayout({
+      phoneNumber: input.phoneNumber,
+      amount: Number(input.amount),
+      reference,
+    });
+
+    return {
+      ok: true,
+      queued: true,
+      reference,
+      phoneNumber: this.normalizePhone(input.phoneNumber),
+      amount: Math.round(Number(input.amount)),
+      response,
+    };
   }
 
   private normalizePhone(phone: string) {

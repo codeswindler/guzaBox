@@ -1,15 +1,18 @@
-import { Controller, Get, Post, Body } from "@nestjs/common";
+import { Controller, Get, Post, Body, UseGuards } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { PaymentTransaction } from "../payments/entities/payment-transaction.entity";
 import { Winner } from "../payouts/entities/winner.entity";
+import { PaymentsService } from "../payments/payments.service";
 import { InstantWinSettings } from "./entities/instant-win-settings.entity";
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 
 @Controller("admin")
 export class InstantWinController {
   constructor(
     private readonly configService: ConfigService,
+    private readonly paymentsService: PaymentsService,
     @InjectRepository(PaymentTransaction)
     private paymentRepo: Repository<PaymentTransaction>,
     @InjectRepository(Winner)
@@ -143,6 +146,26 @@ export class InstantWinController {
 
     await this.settingsRepo.save(settings);
     return { success: true };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post("instant-win/test-b2c")
+  async testB2c(@Body() body: { phoneNumber?: string; amount?: number }) {
+    const phoneNumber = String(body.phoneNumber ?? "").trim();
+    const amount = Number(body.amount ?? 0);
+    if (!phoneNumber) {
+      return { ok: false, message: "phoneNumber is required" };
+    }
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return { ok: false, message: "amount must be a positive number" };
+    }
+
+    // Guardrail: prevent accidental huge payouts during testing.
+    if (amount > 20000) {
+      return { ok: false, message: "amount too large for test payout (max 20000)" };
+    }
+
+    return this.paymentsService.initiateTestB2CPayout({ phoneNumber, amount });
   }
 
   private getNairobiDayBounds() {
