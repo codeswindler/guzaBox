@@ -23,7 +23,7 @@ export class AdvantaSmsService {
   private readonly sendUrlOverride: string;
 
   constructor(private readonly configService: ConfigService) {
-    // Support both ADVENTA_* and ADVANTA_* keys to reduce production misconfig risk.
+    // Support both ADVENTA_* and ADVANTA_* keys; ADVANTA_* is the preferred spelling.
     const get = (primary: string, secondary: string, fallback = "") =>
       this.configService.get<string>(primary) ||
       this.configService.get<string>(secondary) ||

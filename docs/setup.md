@@ -17,10 +17,11 @@ Set these variables in your host environment or a local `.env` file:
 - `ADMIN_EMAIL=admin@example.com`
 - `USSD_CODE=*519*63#`
 - `SMS_PROVIDER=stub`
-- `ADVENTA_BASE_URL=https://developers.advantasms.com/sms-api`
-- `ADVENTA_PARTNER_ID=`
-- `ADVENTA_API_KEY=`
-- `ADVENTA_SHORTCODE=`
+- `ADVANTA_BASE_URL=https://developers.advantasms.com`
+- `ADVANTA_SEND_PATH=/api/services/sendotp`
+- `ADVANTA_PARTNER_ID=`
+- `ADVANTA_API_KEY=`
+- `ADVANTA_SHORTCODE=`
 - `MPESA_BASE_URL=`
 - `MPESA_CONSUMER_KEY=`
 - `MPESA_CONSUMER_SECRET=`
