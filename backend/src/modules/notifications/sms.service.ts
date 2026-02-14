@@ -24,16 +24,19 @@ export class SmsService {
   }
 
   async sendLossNotification(phoneNumber: string, betId: string, selectedBox: number, boxResults: { [key: number]: number }) {
+    const ussdCode = this.getUssdCode();
     const message = `Almost won. Try again.
 
 You chose ${selectedBox}
 
 ${Object.entries(boxResults)
-  .map(([box, value]) => `Box ${parseInt(box) + 1}: ${value}`)
-  .join('\n')}
+  .sort((a, b) => Number(a[0]) - Number(b[0]))
+  .map(([box, value]) => `Box ${box}: ${value}`)
+  .join("\n")}
 
 Bet: ${betId}
-Dial (ussd) to win more.`;
+
+Dial ${ussdCode} to win more.`;
     
     await this.provider.send({ to: phoneNumber, message });
   }
@@ -41,6 +44,11 @@ Dial (ussd) to win more.`;
   async sendAutoWinNotification(phoneNumber: string, amount: number, betId: string) {
     const message = `🎉 INSTANT WIN! You won Ksh ${amount}!\n\nBet ID: ${betId}\n\nPrize sent to your M-Pesa immediately.\n\nPlay Lucky Box again for more chances to win!`;
     await this.provider.send({ to: phoneNumber, message });
+  }
+
+  private getUssdCode() {
+    // This is the dial string players use, e.g. *519*63#
+    return this.configService.get<string>("USSD_CODE", "*519*63#");
   }
 
   private formatBoxResults(boxes: any): string {

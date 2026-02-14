@@ -358,13 +358,22 @@ export class PaymentsService {
         this.logger.warn(`Winner SMS failed: ${(error as Error).message}`);
       }
     } else if (outcome.ok && outcome.won === false) {
-      const loserMessage = globalSettings.loserMessage || "Almost won. Try again.";
+      const loserMessage =
+        globalSettings.loserMessage || "Almost won. Try again.";
       const transaction = await this.paymentRepo.findOne({
         where: { checkoutRequestId },
       });
       if (transaction?.phoneNumber) {
         try {
-          await this.smsService.send({ to: transaction.phoneNumber, message: loserMessage });
+          // Prefer the richer "game style" loser SMS (chosen box + box results + betId),
+          // falling back to the configured loserMessage if we can't resolve session context.
+          const sent = await this.trySendLossSmsWithBoxResults(transaction);
+          if (!sent) {
+            await this.smsService.send({
+              to: transaction.phoneNumber,
+              message: loserMessage,
+            });
+          }
         } catch (error) {
           this.logger.warn(`Loser SMS failed: ${(error as Error).message}`);
         }
@@ -493,6 +502,74 @@ export class PaymentsService {
     session.state = "LOST";
     session.wonAmount = null;
     await sessionRepo.save(session);
+  }
+
+  private async trySendLossSmsWithBoxResults(transaction: PaymentTransaction) {
+    if (!transaction.phoneNumber || !transaction.sessionId) return false;
+
+    const session = await this.sessionRepo.findOne({
+      where: { sessionId: transaction.sessionId },
+    });
+    if (!session?.betId || !session.selectedBox) return false;
+
+    const selectedBoxNum = Number(
+      String(session.selectedBox).replace(/[^0-9]/g, "")
+    );
+    if (!Number.isFinite(selectedBoxNum) || selectedBoxNum < 1) return false;
+
+    const results = this.generateBoxResults({
+      selectedBox: selectedBoxNum,
+      boxCount: 5,
+      forceLose: true,
+    });
+
+    await this.smsService.sendLossNotification(
+      transaction.phoneNumber,
+      session.betId,
+      selectedBoxNum,
+      results
+    );
+    return true;
+  }
+
+  private generateBoxResults(opts: {
+    selectedBox: number;
+    boxCount: number;
+    forceLose: boolean;
+  }) {
+    const count = Math.max(2, Math.min(opts.boxCount, 20));
+    const selected = Math.max(1, Math.min(opts.selectedBox, count));
+
+    // Create at least one winning box. If forceLose, ensure it's not the selected box.
+    const winnersTarget = Math.random() > 0.7 ? 2 : 1;
+    const results: { [key: number]: number } = {};
+
+    // Start with all zeros.
+    for (let i = 1; i <= count; i++) results[i] = 0;
+
+    const candidateBoxes = Array.from({ length: count }, (_, idx) => idx + 1);
+    const shuffled = candidateBoxes.sort(() => Math.random() - 0.5);
+    const winnerBoxes: number[] = [];
+
+    for (const b of shuffled) {
+      if (winnerBoxes.length >= winnersTarget) break;
+      if (opts.forceLose && b === selected) continue;
+      winnerBoxes.push(b);
+    }
+    if (winnerBoxes.length === 0) {
+      // As a last resort, pick the first non-selected box.
+      winnerBoxes.push(selected === 1 ? 2 : 1);
+    }
+
+    for (const b of winnerBoxes) {
+      // Sample values similar to your example; keep them as integers.
+      results[b] = this.randomBetween(50, 9999);
+    }
+
+    // Ensure losing selected box has 0.
+    if (opts.forceLose) results[selected] = 0;
+
+    return results;
   }
 
   private getNairobiDayBounds() {

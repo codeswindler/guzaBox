@@ -12,8 +12,7 @@ Chagua Box yako ya Ushindi
 2. Box 2
 3. Box 3
 4. Box 4
-5. Box 5
-6. Box 6`;
+5. Box 5`;
 
 @Injectable()
 export class UssdService {
@@ -44,9 +43,9 @@ export class UssdService {
 
     // Handle USSD code input (like *519# or *519*63#)
     if (text.includes("*") || text.includes("#")) {
-      const ussdCode = this.configService.get<string>("USSD_CODE", "*519#");
-      const cleanedCode = ussdCode.replace("*", "").replace("#", "");
-      const cleanedInput = text.replace("*", "").replace("#", "");
+      const ussdCode = this.configService.get<string>("USSD_CODE", "*519*63#");
+      const cleanedCode = ussdCode.replace(/[*#]/g, "");
+      const cleanedInput = text.replace(/[*#]/g, "");
       
       // If input contains USSD code patterns, show menu
       if (cleanedInput.includes(cleanedCode) || cleanedInput === "") {
@@ -62,20 +61,25 @@ export class UssdService {
     }
 
     // Special handling for common USSD patterns that should show menu
-    if (normalizedInput === "63" || normalizedInput === "519" || normalizedInput === "51963") {
+    if (
+      normalizedInput === "63" ||
+      normalizedInput === "519" ||
+      normalizedInput === "51963"
+    ) {
       return `CON ${MENU_TEXT}`;
     }
 
     if (session.state === "START") {
       const choice = normalizedInput.trim();
       
-      // Validate choice (must be 1-6)
-      if (!["1", "2", "3", "4", "5", "6"].includes(choice)) {
+      // Validate choice (must be 1-5)
+      if (!["1", "2", "3", "4", "5"].includes(choice)) {
         return `CON ${MENU_TEXT}\nInvalid choice. Try again.`;
       }
 
       session.state = "STK_PENDING";
       session.selectedBox = `Box ${choice}`;
+      session.betId = session.betId ?? this.generateBetId();
       await this.sessionRepo.save(session);
 
       const amount = this.paymentsService.pickStakeAmount(20, 30);
@@ -100,5 +104,14 @@ export class UssdService {
     }
 
     return "END Session in progress. Please wait.";
+  }
+
+  private generateBetId(): string {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let result = "";
+    for (let i = 0; i < 8; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return `Z1o${result}`;
   }
 }

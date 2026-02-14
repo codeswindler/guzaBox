@@ -15,6 +15,7 @@ Set these variables in your host environment or a local `.env` file:
 - `JWT_SECRET=change-me`
 - `ADMIN_PHONE=254700000000`
 - `ADMIN_EMAIL=admin@example.com`
+- `USSD_CODE=*519*63#`
 - `SMS_PROVIDER=stub`
 - `ADVENTA_BASE_URL=https://developers.advantasms.com/sms-api`
 - `ADVENTA_PARTNER_ID=`
@@ -35,6 +36,26 @@ Set these variables in your host environment or a local `.env` file:
 - `MPESA_B2C_TIMEOUT_URL=`
 - `MPESA_B2C_REMARKS=Lucky Box instant payout`
 - `MPESA_B2C_OCCASION=InstantWin`
+
+## USSD Webhook
+
+The backend exposes a USSD webhook at:
+
+- `GET /ussd`
+- `POST /ussd`
+
+It responds with plain text in the standard format:
+
+- `CON ...` to continue the session
+- `END ...` to terminate the session
+
+The controller accepts multiple common field-name variants (so it works with different aggregators),
+including:
+
+- Session id: `SESSIONID`, `SESSION_ID`, `sessionId`
+- Phone/MSISDN: `MSISDN`, `phoneNumber`, `phone`
+- User input/text: `INPUT`, `text`
+- Service/USSD code: `USSDCODE`, `ussdCode`, `SERVICECODE`, `SERVICE_CODE`, `serviceCode`
 
 ## Dashboard Environment
 
