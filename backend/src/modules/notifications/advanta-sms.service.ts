@@ -19,6 +19,8 @@ export class AdvantaSmsService {
   private readonly partnerId: string;
   private readonly apiKey: string;
   private readonly shortcode: string;
+  private readonly sendPath: string;
+  private readonly sendUrlOverride: string;
 
   constructor(private readonly configService: ConfigService) {
     // Support both ADVENTA_* and ADVANTA_* keys to reduce production misconfig risk.
@@ -35,6 +37,8 @@ export class AdvantaSmsService {
     this.partnerId = get("ADVENTA_PARTNER_ID", "ADVANTA_PARTNER_ID");
     this.apiKey = get("ADVENTA_API_KEY", "ADVANTA_API_KEY");
     this.shortcode = get("ADVENTA_SHORTCODE", "ADVANTA_SHORTCODE");
+    this.sendPath = get("ADVENTA_SEND_PATH", "ADVANTA_SEND_PATH", "/send");
+    this.sendUrlOverride = get("ADVENTA_SEND_URL", "ADVANTA_SEND_URL");
   }
 
   async send(payload: SmsPayload): Promise<AdvantaSmsResponse> {
@@ -46,14 +50,8 @@ export class AdvantaSmsService {
         };
       }
 
-      const sendUrl = `${this.baseUrl}/send`;
-      const requestData = {
-        partnerId: this.partnerId,
-        apiKey: this.apiKey,
-        shortcode: this.shortcode,
-        mobile: payload.to.replace(/[^0-9]/g, ''), // Clean phone number
-        message: payload.message,
-      };
+      const sendUrl = this.resolveSendUrl();
+      const requestData = this.buildRequestData(sendUrl, payload);
 
       console.log(
         "Sending SMS via Advanta",
@@ -61,6 +59,8 @@ export class AdvantaSmsService {
           {
             baseUrl: this.baseUrl,
             url: sendUrl,
+            sendPath: this.sendPath,
+            sendUrlOverride: this.sendUrlOverride ? "[set]" : "",
             partnerId: this.partnerId,
             shortcode: this.shortcode,
             mobile: requestData.mobile,
@@ -111,6 +111,44 @@ export class AdvantaSmsService {
         message: error.response?.data?.message || error.message || 'SMS service unavailable',
       };
     }
+  }
+
+  private resolveSendUrl() {
+    if (this.sendUrlOverride) return this.sendUrlOverride;
+    return this.joinUrl(this.baseUrl, this.sendPath || "/send");
+  }
+
+  private joinUrl(base: string, path: string) {
+    const cleanBase = String(base || "").replace(/\/+$/, "");
+    const cleanPath = String(path || "").replace(/^\/+/, "");
+    return `${cleanBase}/${cleanPath}`;
+  }
+
+  private buildRequestData(sendUrl: string, payload: SmsPayload) {
+    const mobile = payload.to.replace(/[^0-9]/g, "");
+
+    // Advanta docs for the OTP/transactional endpoint use:
+    // POST https://{{url}}/api/services/sendotp
+    // { apikey, partnerID, mobile, message, shortcode }
+    // Ref: https://developers.advantasms.com/sms-api/
+    if (sendUrl.includes("/api/services/")) {
+      return {
+        apikey: this.apiKey,
+        partnerID: this.partnerId,
+        mobile,
+        message: payload.message,
+        shortcode: this.shortcode,
+      };
+    }
+
+    // Older/alternate gateways use { partnerId, apiKey, shortcode, mobile, message }.
+    return {
+      partnerId: this.partnerId,
+      apiKey: this.apiKey,
+      shortcode: this.shortcode,
+      mobile,
+      message: payload.message,
+    };
   }
 
   async sendLossNotification(phoneNumber: string, betId: string, boxes: any): Promise<AdvantaSmsResponse> {
