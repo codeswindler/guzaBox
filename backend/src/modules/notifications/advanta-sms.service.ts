@@ -84,20 +84,17 @@ export class AdvantaSmsService {
       );
 
       const result = response.data;
-      
-      if (result.status === 'success' || result.status === 'SUCCESS') {
-        console.log(`SMS sent successfully to ${payload.to}. Message ID: ${result.messageId}`);
-        return {
-          status: 'success',
-          messageId: result.messageId,
-        };
-      } else {
-        console.error(`SMS sending failed:`, result);
-        return {
-          status: 'failed',
-          message: result.message || 'Unknown error from Advanta SMS',
-        };
+      const normalized = this.normalizeProviderResult(result);
+
+      if (normalized.status === "success") {
+        console.log(
+          `SMS sent successfully to ${payload.to}.${normalized.messageId ? ` Message ID: ${normalized.messageId}` : ""}`
+        );
+        return normalized;
       }
+
+      console.error(`SMS sending failed:`, result);
+      return normalized;
     } catch (error: any) {
       console.error(`SMS service error:`, {
         message: error.message,
@@ -111,6 +108,52 @@ export class AdvantaSmsService {
         message: error.response?.data?.message || error.message || 'SMS service unavailable',
       };
     }
+  }
+
+  private normalizeProviderResult(result: any): AdvantaSmsResponse {
+    // Format A (some gateways):
+    // { status: "success", messageId: "..." }
+    const rawStatus = typeof result?.status === "string" ? result.status : "";
+    const normalizedStatus = rawStatus.toLowerCase().trim();
+    if (["success", "ok", "sent"].includes(normalizedStatus)) {
+      const messageId =
+        typeof result?.messageId === "string"
+          ? result.messageId
+          : typeof result?.messageid === "string"
+            ? result.messageid
+            : undefined;
+      return { status: "success", messageId };
+    }
+
+    // Format B (Advanta OTP endpoint observed):
+    // { responses: [ { 'response-code': 200, 'response-description': 'Success', messageid: '...' } ] }
+    const first = Array.isArray(result?.responses) ? result.responses[0] : undefined;
+    const responseCode = first?.["response-code"] ?? first?.responseCode ?? first?.code;
+    const responseDesc =
+      first?.["response-description"] ?? first?.responseDescription ?? first?.description;
+
+    const codeNum = typeof responseCode === "number" ? responseCode : Number(responseCode);
+    const descStr = typeof responseDesc === "string" ? responseDesc : "";
+    const descOk = descStr.toLowerCase().includes("success");
+    if (codeNum === 200 && descOk) {
+      const messageId =
+        typeof first?.messageid === "string"
+          ? first.messageid
+          : typeof first?.messageId === "string"
+            ? first.messageId
+            : undefined;
+      return { status: "success", messageId };
+    }
+
+    // Fall back to a "failed" result with best-effort reason string.
+    const message =
+      typeof result?.message === "string"
+        ? result.message
+        : typeof descStr === "string" && descStr
+          ? descStr
+          : "Unknown error from Advanta SMS";
+
+    return { status: "failed", message };
   }
 
   private resolveSendUrl() {

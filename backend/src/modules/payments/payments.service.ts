@@ -827,6 +827,8 @@ export class PaymentsService {
     const securityCredential =
       this.configService.get<string>("MPESA_B2C_SECURITY_CREDENTIAL") ||
       this.configService.get<string>("MPESA_SECURITY_KEY");
+    const commandId =
+      this.configService.get<string>("MPESA_B2C_COMMAND_ID") || "BusinessPayment";
     const publicBaseUrl = this.configService.get<string>("PUBLIC_BASE_URL");
     const resultUrl =
       this.configService.get<string>("MPESA_B2C_RESULT_URL") ||
@@ -844,7 +846,21 @@ export class PaymentsService {
     if (!timeoutUrl) missing.push("MPESA_B2C_TIMEOUT_URL (or PUBLIC_BASE_URL)");
 
     if (missing.length) {
-      return { ok: false, queued: false, reason: "B2C not configured", missing };
+      return {
+        ok: false,
+        queued: false,
+        reason: "B2C not configured",
+        missing,
+        configUsed: {
+          baseUrl,
+          shortcode,
+          initiatorName,
+          commandId,
+          publicBaseUrl,
+          resultUrl,
+          timeoutUrl,
+        },
+      };
     }
 
     const reference = `TEST_B2C_${Date.now()}`;
@@ -860,6 +876,15 @@ export class PaymentsService {
       reference,
       phoneNumber: this.normalizePhone(input.phoneNumber),
       amount: Math.round(Number(input.amount)),
+      configUsed: {
+        baseUrl,
+        shortcode,
+        initiatorName,
+        commandId,
+        publicBaseUrl,
+        resultUrl,
+        timeoutUrl,
+      },
       response,
     };
   }
