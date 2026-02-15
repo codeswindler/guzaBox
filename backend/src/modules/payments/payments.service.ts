@@ -3,6 +3,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { DataSource, Repository } from "typeorm";
 import { ConfigService } from "@nestjs/config";
 import axios from "axios";
+import { createHash } from "crypto";
 import { PaymentTransaction } from "./entities/payment-transaction.entity";
 import { MpesaTokenService } from "./mpesa-token.service";
 import { Winner } from "../payouts/entities/winner.entity";
@@ -31,6 +32,13 @@ export class PaymentsService {
     private readonly smsService: SmsService,
     private readonly dataSource: DataSource,
   ) {}
+
+  private fingerprintSecret(value: string) {
+    const v = String(value ?? "");
+    if (!v) return "";
+    // Non-reversible fingerprint, safe to log for debugging env-loading issues.
+    return createHash("sha256").update(v).digest("hex").slice(0, 10);
+  }
 
   async markStalePendingTransactions() {
     const timeoutMinutes = Number(
@@ -808,6 +816,16 @@ export class PaymentsService {
       JSON.stringify({
         event: "mpesa_b2c_request_queued",
         reference: input.reference,
+        config: {
+          baseUrl,
+          shortcode,
+          initiatorName,
+          commandId,
+          resultUrl,
+          timeoutUrl,
+          securityCredentialLen: String(securityCredential || "").length,
+          securityCredentialFp: this.fingerprintSecret(securityCredential || ""),
+        },
         phoneNumber: this.normalizePhone(input.phoneNumber),
         amount: Math.round(Number(input.amount)),
         response: response.data,
@@ -861,6 +879,8 @@ export class PaymentsService {
           publicBaseUrl,
           resultUrl,
           timeoutUrl,
+          securityCredentialLen: String(securityCredential || "").length,
+          securityCredentialFp: this.fingerprintSecret(securityCredential || ""),
         },
       };
     }
@@ -886,6 +906,8 @@ export class PaymentsService {
         publicBaseUrl,
         resultUrl,
         timeoutUrl,
+        securityCredentialLen: String(securityCredential || "").length,
+        securityCredentialFp: this.fingerprintSecret(securityCredential || ""),
       },
       response,
     };
