@@ -778,6 +778,8 @@ export class PaymentsService {
 
     const token = await this.mpesaTokenService.getAccessToken();
     const payload = {
+      // Optional in Daraja, but including it makes correlating callbacks much easier.
+      OriginatorConversationID: input.reference,
       InitiatorName: initiatorName,
       SecurityCredential: securityCredential,
       CommandID: commandId,
