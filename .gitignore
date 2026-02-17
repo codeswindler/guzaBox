@@ -9,3 +9,8 @@ build/
 .idea/
 .vscode/
 *.log
+# M-Pesa certificates (keep secure, never commit)
+backend/certs/
+**/*.cer
+**/*.pem
+**/*.crt
