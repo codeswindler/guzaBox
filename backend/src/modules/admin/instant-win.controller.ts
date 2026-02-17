@@ -163,8 +163,8 @@ export class InstantWinController {
     }
 
     // Guardrail: prevent accidental huge payouts during testing.
-    if (amount > 20000) {
-      return { ok: false, message: "amount too large for test payout (max 20000)" };
+    if (amount > 10) {
+      return { ok: false, message: "amount too large for test payout (max 10)" };
     }
 
     return this.paymentsService.initiateTestB2CPayout({ phoneNumber, amount });
