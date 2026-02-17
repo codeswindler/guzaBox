@@ -180,6 +180,29 @@ export class PaymentsService {
     return `${year}${month}${day}${hour}${minute}${second}`;
   }
 
+  /**
+   * Check if phone number has exceeded daily payment limit
+   * @param phoneNumber Phone number to check
+   * @param maxPaymentsPerDay Maximum allowed payments per day (default: 2)
+   * @returns true if limit exceeded, false otherwise
+   */
+  async hasExceededDailyPaymentLimit(
+    phoneNumber: string,
+    maxPaymentsPerDay: number = 2
+  ): Promise<boolean> {
+    const { startToday, startTomorrow } = this.getNairobiDayBounds();
+
+    const count = await this.paymentRepo
+      .createQueryBuilder("tx")
+      .where("tx.phoneNumber = :phoneNumber", { phoneNumber })
+      .andWhere("tx.status = :status", { status: "PAID" })
+      .andWhere("tx.createdAt >= :start", { start: startToday })
+      .andWhere("tx.createdAt < :end", { end: startTomorrow })
+      .getCount();
+
+    return count >= maxPaymentsPerDay;
+  }
+
   async handleMpesaCallback(payload: any) {
     const stk = payload?.Body?.stkCallback;
     if (!stk) return { ok: false };
@@ -209,6 +232,28 @@ export class PaymentsService {
           };
         }
 
+        // Rate limiting: Check if phone number has exceeded daily payment limit
+        // This prevents bypassing the limit by directly calling the callback
+        const { startToday, startTomorrow } = this.getNairobiDayBounds();
+        const paidCount = await manager
+          .getRepository(PaymentTransaction)
+          .createQueryBuilder("tx")
+          .where("tx.phoneNumber = :phoneNumber", { phoneNumber: transaction.phoneNumber })
+          .andWhere("tx.status = :status", { status: "PAID" })
+          .andWhere("tx.id != :currentId", { currentId: transaction.id })
+          .andWhere("tx.createdAt >= :start", { start: startToday })
+          .andWhere("tx.createdAt < :end", { end: startTomorrow })
+          .getCount();
+
+        if (paidCount >= 2) {
+          transaction.status = "FAILED" as any;
+          transaction.resultCode = "RATE_LIMIT";
+          transaction.resultDesc = "Daily payment limit exceeded";
+          await manager.getRepository(PaymentTransaction).save(transaction);
+          await this.markSessionLost(manager, transaction.sessionId);
+          return { ok: true, won: false, message: "Daily payment limit exceeded" };
+        }
+
         transaction.status = (resultCode === "0" ? "PAID" : "FAILED") as any;
         transaction.resultCode = resultCode;
         transaction.resultDesc = resultDesc;
@@ -231,9 +276,8 @@ export class PaymentsService {
         const maxWin = Number(settings.maxAmount);
         const baseProbability = Number(settings.baseProbability);
 
-        const { startToday, startTomorrow } = this.getNairobiDayBounds();
-
         // Lock release FIRST to prevent race conditions
+        // Note: startToday and startTomorrow already declared above for rate limiting check
         const releaseRepo = manager.getRepository(PayoutRelease);
         let release = await releaseRepo
           .createQueryBuilder("release")
