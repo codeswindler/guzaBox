@@ -40,11 +40,6 @@ export class SmsService {
     await this.sendOrThrow({ to: phoneNumber, message });
   }
 
-  async sendAutoWinNotification(phoneNumber: string, amount: number, betId: string) {
-    const message = `🎉 INSTANT WIN! You won Ksh ${amount}!\n\nBet ID: ${betId}\n\nPrize sent to your M-Pesa immediately.\n\nPlay Lucky Box again for more chances to win!`;
-    await this.sendOrThrow({ to: phoneNumber, message });
-  }
-
   private getUssdCode() {
     // This is the dial string players use, e.g. *519*63#
     return this.configService.get<string>("USSD_CODE", "*519*63#");

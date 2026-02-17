@@ -233,6 +233,19 @@ export class PaymentsService {
 
         const { startToday, startTomorrow } = this.getNairobiDayBounds();
 
+        // Lock release FIRST to prevent race conditions
+        const releaseRepo = manager.getRepository(PayoutRelease);
+        let release = await releaseRepo
+          .createQueryBuilder("release")
+          .setLock("pessimistic_write")
+          .where("release.createdBy = :createdBy", {
+            createdBy: "instant-win-system",
+          })
+          .andWhere("release.createdAt >= :start", { start: startToday })
+          .andWhere("release.createdAt < :end", { end: startTomorrow })
+          .getOne();
+
+        // Calculate current collections
         const collectedRow = await manager
           .getRepository(PaymentTransaction)
           .createQueryBuilder("tx")
@@ -242,22 +255,22 @@ export class PaymentsService {
           .andWhere("tx.createdAt < :end", { end: startTomorrow })
           .getRawOne();
         const collectedToday = Number(collectedRow?.amount ?? 0);
-        const capAmount = Math.max(0, (collectedToday * capPercent) / 100);
+        
+        // Calculate new budget based on current collections and percentage
+        const newBudget = Math.max(0, (collectedToday * capPercent) / 100);
+        
+        // Implement protected budget growth (Option A):
+        // - Always applies new percentage
+        // - Never decreases below what's already been paid
+        // - Never decreases below previous budget cap
+        // - Allows budget to grow as collections increase
+        const totalReleased = Number(release?.totalReleased ?? 0);
+        const previousBudget = Number(release?.releaseBudget ?? 0);
+        const effectiveBudget = Math.max(newBudget, totalReleased, previousBudget);
 
-        const paidOutRow = await manager
-          .getRepository(Winner)
-          .createQueryBuilder("winner")
-          .leftJoin("winner.release", "release")
-          .select("SUM(winner.amount)", "amount")
-          .where("release.createdBy = :createdBy", {
-            createdBy: "instant-win-system",
-          })
-          .andWhere("winner.createdAt >= :start", { start: startToday })
-          .andWhere("winner.createdAt < :end", { end: startTomorrow })
-          .getRawOne();
-        const paidOutToday = Number(paidOutRow?.amount ?? 0);
-
-        const remainingBudget = Math.max(capAmount - paidOutToday, 0);
+        // Use locked release data for remaining budget (faster and more accurate)
+        const remainingBudget = Math.max(effectiveBudget - totalReleased, 0);
+        
         const canAffordMinimum =
           Number.isFinite(minWin) && minWin > 0 && remainingBudget >= minWin;
         const probabilityPass =
@@ -271,42 +284,34 @@ export class PaymentsService {
             ok: true,
             won: false,
             message: "No win",
-            capAmount,
+            capAmount: effectiveBudget,
             remainingBudget,
           };
         }
 
-        const cappedMax = Math.min(maxWin, remainingBudget);
+        // Add 2 KES safety margin to prevent rounding/race condition edge cases
+        const cappedMax = Math.min(maxWin, Math.max(remainingBudget - 2, minWin));
         if (cappedMax < minWin) {
           await this.markSessionLost(manager, transaction.sessionId);
           return {
             ok: true,
             won: false,
             message: "Budget exhausted",
-            capAmount,
+            capAmount: effectiveBudget,
             remainingBudget,
           };
         }
 
         const prizeAmount = this.randomBetween(minWin, cappedMax);
-        const releaseRepo = manager.getRepository(PayoutRelease);
-        let release = await releaseRepo
-          .createQueryBuilder("release")
-          .setLock("pessimistic_write")
-          .where("release.createdBy = :createdBy", {
-            createdBy: "instant-win-system",
-          })
-          .andWhere("release.createdAt >= :start", { start: startToday })
-          .andWhere("release.createdAt < :end", { end: startTomorrow })
-          .getOne();
 
+        // Create or update release record
         if (!release) {
           release = await releaseRepo.save(
             releaseRepo.create({
               percentage: capPercent,
               minWin,
               maxWin,
-              releaseBudget: capAmount,
+              releaseBudget: effectiveBudget,
               totalReleased: 0,
               totalWinners: 0,
               createdBy: "instant-win-system",
@@ -316,7 +321,7 @@ export class PaymentsService {
           release.percentage = capPercent;
           release.minWin = minWin;
           release.maxWin = maxWin;
-          release.releaseBudget = capAmount;
+          release.releaseBudget = effectiveBudget;
         }
 
         await manager.getRepository(Winner).save(
@@ -335,13 +340,29 @@ export class PaymentsService {
         release.totalReleased = Number(release.totalReleased) + prizeAmount;
         await releaseRepo.save(release);
 
+        // Budget overrun monitoring - alert if we exceed effective budget
+        if (release.totalReleased > effectiveBudget) {
+          this.logger.warn(
+            JSON.stringify({
+              event: "budget_overrun_detected",
+              effectiveBudget,
+              totalReleased: release.totalReleased,
+              overrun: release.totalReleased - effectiveBudget,
+              transactionId: transaction.id,
+              phoneNumber: transaction.phoneNumber,
+              prizeAmount,
+            })
+          );
+        }
+
         await this.markSessionWon(manager, transaction.sessionId, prizeAmount);
+        const finalRemainingBudget = Math.max(effectiveBudget - release.totalReleased, 0);
         return {
           ok: true,
           won: true,
           prizeAmount,
-          capAmount,
-          remainingBudget: Math.max(remainingBudget - prizeAmount, 0),
+          capAmount: effectiveBudget,
+          remainingBudget: finalRemainingBudget,
           phoneNumber: transaction.phoneNumber,
           transactionId: transaction.id,
         };
@@ -368,9 +389,9 @@ export class PaymentsService {
     } else if (outcome.ok && outcome.won === false) {
       const loserMessage =
         globalSettings.loserMessage || "Almost won. Try again.";
-      const transaction = await this.paymentRepo.findOne({
-        where: { checkoutRequestId },
-      });
+    const transaction = await this.paymentRepo.findOne({
+      where: { checkoutRequestId },
+    });
       if (transaction?.phoneNumber) {
         try {
           // Prefer the richer "game style" loser SMS (chosen box + box results + betId),

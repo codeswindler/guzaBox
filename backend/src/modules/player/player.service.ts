@@ -87,50 +87,6 @@ export class PlayerService {
     };
   }
 
-  async getEligiblePlayersForAutoWin() {
-    const { startToday, startTomorrow } = this.getTodayBounds();
-    
-    // Players who played today but haven't won
-    return await this.playerRepo
-      .createQueryBuilder("player")
-      .leftJoin("player.transactions", "tx")
-      .where("tx.createdAt >= :start", { start: startToday })
-      .andWhere("tx.createdAt < :end", { end: startTomorrow })
-      .andWhere("tx.status = :status", { status: "PAID" })
-      .getMany();
-  }
-
-  calculateWinProbability(player: Player): number {
-    const baseProb = this.configService.get<number>("AUTO_WIN_BASE_PROBABILITY", 0.1);
-    const neverWonBonus = this.configService.get<number>("AUTO_WIN_NEVER_WON_BONUS", 0.3);
-    
-    let probability = baseProb;
-    
-    // Bonus for never-won players
-    if (!player.hasWonBefore) {
-      probability += neverWonBonus;
-    }
-    
-    // Bonus for persistent players (5+ transactions)
-    if (player.transactionCount >= 5) {
-      probability += 0.05;
-    }
-    
-    // Bonus for high loyalty scores
-    if (player.loyaltyScore >= 50) {
-      probability += 0.05;
-    }
-    
-    // Reduce probability if won recently
-    if (player.lastWinAt) {
-      const daysSinceWin = Math.floor((Date.now() - player.lastWinAt.getTime()) / (1000 * 60 * 60 * 24));
-      if (daysSinceWin < 3) {
-        probability *= 0.5; // Halve chance if won in last 3 days
-      }
-    }
-    
-    return Math.min(probability, 0.8); // Max 80% chance
-  }
 
   private getLoyaltyTier(score: number): string {
     if (score >= 100) return "Gold";

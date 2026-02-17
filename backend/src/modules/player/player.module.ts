@@ -7,7 +7,6 @@ import { PaymentTransaction } from "../payments/entities/payment-transaction.ent
 import { Winner } from "../payouts/entities/winner.entity";
 import { PayoutRelease } from "../payouts/entities/payout-release.entity";
 import { PlayerService } from "./player.service";
-import { AutoWinService } from "./auto-win.service";
 
 @Module({
   imports: [
@@ -15,7 +14,7 @@ import { AutoWinService } from "./auto-win.service";
     NotificationsModule,
     TypeOrmModule.forFeature([Player, PaymentTransaction, Winner, PayoutRelease]),
   ],
-  providers: [PlayerService, AutoWinService],
-  exports: [PlayerService, AutoWinService],
+  providers: [PlayerService],
+  exports: [PlayerService],
 })
 export class PlayerModule {}

@@ -212,15 +212,6 @@ export class AdvantaSmsService {
     });
   }
 
-  async sendAutoWinNotification(phoneNumber: string, amount: number, betId: string): Promise<AdvantaSmsResponse> {
-    const message = `🎉 INSTANT WIN! You won Ksh ${amount}!\n\nBet ID: ${betId}\n\nPrize sent to your M-Pesa immediately.\n\nPlay Lucky Box again for more chances to win!`;
-    
-    return this.send({
-      to: phoneNumber,
-      message,
-    });
-  }
-
   async sendOtp(phoneNumber: string, code: string): Promise<AdvantaSmsResponse> {
     const message = `Your Lucky Box OTP is ${code}. It expires in 5 minutes.`;
     
