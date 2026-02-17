@@ -32,7 +32,30 @@ if (!fs.existsSync(certPath)) {
 
 try {
   // Read the certificate file
-  const certBuffer = fs.readFileSync(certPath);
+  let certBuffer = fs.readFileSync(certPath);
+  let certString = certBuffer.toString();
+  
+  // If it's DER format (binary), try to convert to PEM
+  // DER certificates don't start with "-----BEGIN"
+  if (!certString.includes("-----BEGIN")) {
+    console.log("Detected DER format certificate, converting to PEM...");
+    try {
+      // Convert DER to PEM using Node.js crypto
+      const cert = crypto.createPublicKey({
+        key: certBuffer,
+        format: 'der',
+        type: 'spki'
+      });
+      const exported = cert.export({ format: 'pem', type: 'spki' });
+      certString = typeof exported === 'string' ? exported : exported.toString('utf8');
+      certBuffer = Buffer.from(certString);
+    } catch (derError: any) {
+      console.error("Failed to auto-convert DER certificate. Please convert manually:");
+      console.error("  openssl x509 -inform DER -in production.cer -out production.pem");
+      console.error("  Then use: ts-node scripts/generate-b2c-credential.ts production.pem \"password\"");
+      throw derError;
+    }
+  }
   
   // Encrypt the initiator password using the certificate's public key
   const encrypted = crypto.publicEncrypt(
@@ -53,8 +76,10 @@ try {
 } catch (error: any) {
   console.error("Error generating SecurityCredential:");
   console.error(error.message);
-  if (error.message.includes("PEM")) {
-    console.error("\nTip: Make sure the certificate file is in PEM format (.cer or .pem)");
+  if (error.message.includes("PEM") || error.message.includes("key")) {
+    console.error("\nTip: If the certificate is in DER format (.cer), convert it first:");
+    console.error("  openssl x509 -inform DER -in production.cer -out production.pem");
+    console.error("  Then use: ts-node scripts/generate-b2c-credential.ts production.pem \"password\"");
   }
   process.exit(1);
 }
