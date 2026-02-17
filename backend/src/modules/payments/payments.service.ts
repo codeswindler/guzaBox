@@ -304,7 +304,31 @@ export class PaymentsService {
 
         const prizeAmount = this.randomBetween(minWin, cappedMax);
 
+        // Final safety check: ensure prize doesn't exceed remaining budget
+        if (prizeAmount > remainingBudget) {
+          this.logger.warn(
+            JSON.stringify({
+              event: "prize_exceeds_budget",
+              prizeAmount,
+              remainingBudget,
+              cappedMax,
+              effectiveBudget,
+              totalReleased,
+            })
+          );
+          await this.markSessionLost(manager, transaction.sessionId);
+          return {
+            ok: true,
+            won: false,
+            message: "Budget exhausted",
+            capAmount: effectiveBudget,
+            remainingBudget,
+          };
+        }
+
         // Create or update release record
+        // Note: SERIALIZABLE isolation level ensures that if two transactions try to create
+        // the release simultaneously, one will succeed and the other will retry automatically
         if (!release) {
           release = await releaseRepo.save(
             releaseRepo.create({
