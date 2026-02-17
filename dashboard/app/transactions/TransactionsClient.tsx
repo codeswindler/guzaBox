@@ -3,6 +3,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import api from "../../lib/api";
 
+// Hook to detect clicks outside an element
+function useClickOutside(ref: React.RefObject<HTMLElement>, handler: () => void) {
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) {
+        handler();
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [ref, handler]);
+}
+
 type Transaction = {
   id: string;
   phoneNumber: string;
@@ -62,10 +75,20 @@ export default function TransactionsClient() {
   const [to, setTo] = useState("");
   const [toasts, setToasts] = useState<string[]>([]);
   const [kpis, setKpis] = useState<Kpis | null>(null);
-  const [kpiRange, setKpiRange] = useState<"today" | "last7" | "allTime">(
+  const [kpiRange, setKpiRange] = useState<"today" | "last7" | "allTime" | "custom">(
     "today"
   );
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
+  const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
+  const customDatePickerRef = useRef<HTMLDivElement>(null);
   const lastSeenRef = useRef<string | null>(null);
+
+  useClickOutside(customDatePickerRef, () => {
+    if (showCustomDatePicker) {
+      setShowCustomDatePicker(false);
+    }
+  });
   const envMock = process.env.NEXT_PUBLIC_MOCK_DATA === "true";
   const [mockEnabled, setMockEnabled] = useState(envMock);
   const [error, setError] = useState("");
@@ -180,17 +203,83 @@ export default function TransactionsClient() {
     }
   };
 
+  const [customKpi, setCustomKpi] = useState<KpiBlock | null>(null);
+  const [customKpiLoading, setCustomKpiLoading] = useState(false);
+
+  const loadCustomKpi = async () => {
+    if (!customStartDate || !customEndDate) {
+      setCustomKpi(null);
+      return;
+    }
+    setCustomKpiLoading(true);
+    try {
+      const start = new Date(customStartDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(customEndDate);
+      end.setHours(23, 59, 59, 999);
+      
+      const fromValue = toSqlDateTime(start.toISOString());
+      const toValue = toSqlDateTime(end.toISOString());
+      
+      const params: Record<string, string> = { status: "PAID" };
+      if (fromValue) params.from = fromValue;
+      if (toValue) params.to = toValue;
+      
+      const res = await api.get("/payments/transactions", { params });
+      const data: Transaction[] = Array.isArray(res.data) ? res.data : [];
+      const amount = data.reduce((sum, tx) => sum + tx.amount, 0);
+      setCustomKpi({ count: data.length, amount });
+    } catch (error) {
+      setError("Failed to load custom date range data.");
+      setCustomKpi(null);
+    } finally {
+      setCustomKpiLoading(false);
+    }
+  };
+
   useEffect(() => {
     load();
     const timer = setInterval(load, mockEnabled ? 12000 : 10000);
     return () => clearInterval(timer);
   }, [mockEnabled, status, from, to]);
 
+  useEffect(() => {
+    if (kpiRange === "custom" && customStartDate && customEndDate) {
+      loadCustomKpi();
+    } else if (kpiRange !== "custom") {
+      setCustomKpi(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kpiRange, customStartDate, customEndDate]);
+
   const visibleItems = status
     ? items.filter((item) => item.status === status)
     : items;
 
   const currentKpi = useMemo(() => {
+    if (kpiRange === "custom") {
+      if (customKpiLoading) {
+        return {
+          label: "Custom Range",
+          current: { count: 0, amount: 0 },
+          previous: { count: 0, amount: 0 },
+        };
+      }
+      if (customKpi) {
+        return {
+          label: customStartDate && customEndDate 
+            ? `${new Date(customStartDate).toLocaleDateString()} - ${new Date(customEndDate).toLocaleDateString()}`
+            : "Custom Range",
+          current: customKpi,
+          previous: { count: 0, amount: 0 }, // No comparison for custom range
+        };
+      }
+      return {
+        label: "Custom Range",
+        current: { count: 0, amount: 0 },
+        previous: { count: 0, amount: 0 },
+      };
+    }
     if (!kpis) return null;
     if (kpiRange === "today") {
       return {
@@ -211,16 +300,16 @@ export default function TransactionsClient() {
       current: kpis.allTime,
       previous: kpis.last30,
     };
-  }, [kpis, kpiRange]);
+  }, [kpis, kpiRange, customKpi, customKpiLoading, customStartDate, customEndDate]);
 
   const trend = useMemo(() => {
-    if (!currentKpi || currentKpi.previous.amount === 0) return null;
+    if (!currentKpi || currentKpi.previous.amount === 0 || kpiRange === "custom") return null;
     const delta =
       ((currentKpi.current.amount - currentKpi.previous.amount) /
         currentKpi.previous.amount) *
       100;
     return Math.round(delta * 10) / 10;
-  }, [currentKpi]);
+  }, [currentKpi, kpiRange]);
 
   const formatMoney = (value: number) =>
     new Intl.NumberFormat("en-KE", {
@@ -238,25 +327,120 @@ export default function TransactionsClient() {
       </p>
       {error && <p className="subtle">{error}</p>}
       <div className="card demo-card kpi-card">
-        <div className="kpi-tabs">
-          <button
-            className={kpiRange === "today" ? "tab active" : "tab"}
-            onClick={() => setKpiRange("today")}
-          >
-            Today
-          </button>
-          <button
-            className={kpiRange === "last7" ? "tab active" : "tab"}
-            onClick={() => setKpiRange("last7")}
-          >
-            7 Days
-          </button>
-          <button
-            className={kpiRange === "allTime" ? "tab active" : "tab"}
-            onClick={() => setKpiRange("allTime")}
-          >
-            All Time
-          </button>
+        <div className="kpi-tabs" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ display: "flex", gap: "0.5rem" }}>
+            <button
+              className={kpiRange === "today" ? "tab active" : "tab"}
+              onClick={() => {
+                setKpiRange("today");
+                setShowCustomDatePicker(false);
+              }}
+            >
+              Today
+            </button>
+            <button
+              className={kpiRange === "last7" ? "tab active" : "tab"}
+              onClick={() => {
+                setKpiRange("last7");
+                setShowCustomDatePicker(false);
+              }}
+            >
+              7 Days
+            </button>
+            <button
+              className={kpiRange === "allTime" ? "tab active" : "tab"}
+              onClick={() => {
+                setKpiRange("allTime");
+                setShowCustomDatePicker(false);
+              }}
+            >
+              All Time
+            </button>
+          </div>
+          <div style={{ position: "relative" }} ref={customDatePickerRef}>
+            <button
+              className={kpiRange === "custom" ? "tab active" : "tab"}
+              onClick={() => {
+                setKpiRange("custom");
+                setShowCustomDatePicker(!showCustomDatePicker);
+              }}
+            >
+              Custom
+            </button>
+            {showCustomDatePicker && kpiRange === "custom" && (
+              <div style={{
+                position: "absolute",
+                right: 0,
+                top: "100%",
+                marginTop: "0.5rem",
+                padding: "1rem",
+                background: "var(--card-bg, #1a1a2e)",
+                border: "1px solid var(--border-color, #333)",
+                borderRadius: "0.5rem",
+                zIndex: 1000,
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.75rem",
+                minWidth: "250px"
+              }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                  <label style={{ fontSize: "0.875rem", color: "var(--text-muted, #999)" }}>
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    value={customStartDate}
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                    style={{
+                      padding: "0.5rem",
+                      background: "var(--input-bg, #0f0f1e)",
+                      border: "1px solid var(--border-color, #333)",
+                      borderRadius: "0.25rem",
+                      color: "var(--text-color, #fff)"
+                    }}
+                  />
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                  <label style={{ fontSize: "0.875rem", color: "var(--text-muted, #999)" }}>
+                    End Date
+                  </label>
+                  <input
+                    type="date"
+                    value={customEndDate}
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                    style={{
+                      padding: "0.5rem",
+                      background: "var(--input-bg, #0f0f1e)",
+                      border: "1px solid var(--border-color, #333)",
+                      borderRadius: "0.25rem",
+                      color: "var(--text-color, #fff)"
+                    }}
+                  />
+                </div>
+                <button
+                  onClick={() => {
+                    if (customStartDate && customEndDate) {
+                      setShowCustomDatePicker(false);
+                    }
+                  }}
+                  disabled={!customStartDate || !customEndDate}
+                  style={{
+                    padding: "0.5rem 1rem",
+                    background: (!customStartDate || !customEndDate) 
+                      ? "var(--border-color, #333)" 
+                      : "var(--primary-color, #6366f1)",
+                    border: "none",
+                    borderRadius: "0.25rem",
+                    color: "#fff",
+                    cursor: (!customStartDate || !customEndDate) ? "not-allowed" : "pointer",
+                    opacity: (!customStartDate || !customEndDate) ? 0.5 : 1
+                  }}
+                >
+                  Apply
+                </button>
+              </div>
+            )}
+          </div>
         </div>
         {currentKpi ? (
           <div className="kpi-body">
