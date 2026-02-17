@@ -181,14 +181,14 @@ export class PaymentsService {
   }
 
   /**
-   * Check if phone number has exceeded daily payment limit
+   * Check if phone number has exceeded daily win limit
    * @param phoneNumber Phone number to check
-   * @param maxPaymentsPerDay Maximum allowed payments per day (default: 2)
+   * @param maxWinsPerDay Maximum allowed wins per day (default: 2)
    * @returns true if limit exceeded, false otherwise
    */
-  async hasExceededDailyPaymentLimit(
+  async hasExceededDailyWinLimit(
     phoneNumber: string,
-    maxPaymentsPerDay: number = 2
+    maxWinsPerDay: number = 2
   ): Promise<boolean> {
     const { startToday, startTomorrow } = this.getNairobiDayBounds();
 
@@ -196,11 +196,13 @@ export class PaymentsService {
       .createQueryBuilder("tx")
       .where("tx.phoneNumber = :phoneNumber", { phoneNumber })
       .andWhere("tx.status = :status", { status: "PAID" })
+      .andWhere("tx.wonAmount IS NOT NULL")
+      .andWhere("tx.wonAmount > 0")
       .andWhere("tx.createdAt >= :start", { start: startToday })
       .andWhere("tx.createdAt < :end", { end: startTomorrow })
       .getCount();
 
-    return count >= maxPaymentsPerDay;
+    return count >= maxWinsPerDay;
   }
 
   async handleMpesaCallback(payload: any) {
@@ -232,27 +234,8 @@ export class PaymentsService {
           };
         }
 
-        // Rate limiting: Check if phone number has exceeded daily payment limit
-        // This prevents bypassing the limit by directly calling the callback
-        const { startToday, startTomorrow } = this.getNairobiDayBounds();
-        const paidCount = await manager
-          .getRepository(PaymentTransaction)
-          .createQueryBuilder("tx")
-          .where("tx.phoneNumber = :phoneNumber", { phoneNumber: transaction.phoneNumber })
-          .andWhere("tx.status = :status", { status: "PAID" })
-          .andWhere("tx.id != :currentId", { currentId: transaction.id })
-          .andWhere("tx.createdAt >= :start", { start: startToday })
-          .andWhere("tx.createdAt < :end", { end: startTomorrow })
-          .getCount();
-
-        if (paidCount >= 2) {
-          transaction.status = "FAILED" as any;
-          transaction.resultCode = "RATE_LIMIT";
-          transaction.resultDesc = "Daily payment limit exceeded";
-          await manager.getRepository(PaymentTransaction).save(transaction);
-          await this.markSessionLost(manager, transaction.sessionId);
-          return { ok: true, won: false, message: "Daily payment limit exceeded" };
-        }
+        // No payment limit - players can make unlimited C2B payments
+        // Win limit will be checked after determining if they won
 
         transaction.status = (resultCode === "0" ? "PAID" : "FAILED") as any;
         transaction.resultCode = resultCode;
@@ -276,8 +259,9 @@ export class PaymentsService {
         const maxWin = Number(settings.maxAmount);
         const baseProbability = Number(settings.baseProbability);
 
+        const { startToday, startTomorrow } = this.getNairobiDayBounds();
+
         // Lock release FIRST to prevent race conditions
-        // Note: startToday and startTomorrow already declared above for rate limiting check
         const releaseRepo = manager.getRepository(PayoutRelease);
         let release = await releaseRepo
           .createQueryBuilder("release")
@@ -399,6 +383,41 @@ export class PaymentsService {
             amount: prizeAmount,
           })
         );
+
+        // Rate limiting: Check if phone number has exceeded daily win limit (max 2 wins per day)
+        // This check happens AFTER determining they won, but BEFORE awarding the prize
+        const winCount = await manager
+          .getRepository(PaymentTransaction)
+          .createQueryBuilder("tx")
+          .where("tx.phoneNumber = :phoneNumber", { phoneNumber: transaction.phoneNumber })
+          .andWhere("tx.status = :status", { status: "PAID" })
+          .andWhere("tx.wonAmount IS NOT NULL")
+          .andWhere("tx.wonAmount > 0")
+          .andWhere("tx.id != :currentId", { currentId: transaction.id })
+          .andWhere("tx.createdAt >= :start", { start: startToday })
+          .andWhere("tx.createdAt < :end", { end: startTomorrow })
+          .getCount();
+
+        if (winCount >= 2) {
+          // Player has already won 2 times today - deny this win
+          this.logger.warn(
+            JSON.stringify({
+              event: "daily_win_limit_exceeded",
+              phoneNumber: transaction.phoneNumber,
+              winCount,
+              attemptedPrize: prizeAmount,
+              transactionId: transaction.id,
+            })
+          );
+          await this.markSessionLost(manager, transaction.sessionId);
+          return {
+            ok: true,
+            won: false,
+            message: "Daily win limit reached",
+            capAmount: effectiveBudget,
+            remainingBudget,
+          };
+        }
 
         transaction.wonAmount = prizeAmount;
         transaction.released = true;

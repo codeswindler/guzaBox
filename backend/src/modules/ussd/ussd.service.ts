@@ -78,15 +78,8 @@ export class UssdService {
         return `CON ${MENU_TEXT}\nInvalid choice. Try again.`;
       }
 
-      // Rate limiting: Check if phone number has exceeded daily payment limit
-      const hasExceededLimit = await this.paymentsService.hasExceededDailyPaymentLimit(
-        phoneNumber,
-        2 // Max 2 payments per day
-      );
-
-      if (hasExceededLimit) {
-        return "END You have reached your daily limit of 2 payments. Try again tomorrow.";
-      }
+      // No payment limit - players can make unlimited payments
+      // Win limit is enforced in payment callback (max 2 wins per day)
 
       session.state = "STK_PENDING";
       session.selectedBox = `Box ${choice}`;
