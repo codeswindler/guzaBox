@@ -227,8 +227,14 @@ export default function TransactionsClient() {
       
       const res = await api.get("/payments/transactions", { params });
       const data: Transaction[] = Array.isArray(res.data) ? res.data : [];
-      const amount = data.reduce((sum, tx) => sum + tx.amount, 0);
-      setCustomKpi({ count: data.length, amount });
+      const amount = data.reduce((sum, tx) => {
+        const txAmount = Number(tx.amount);
+        return sum + (Number.isFinite(txAmount) ? txAmount : 0);
+      }, 0);
+      setCustomKpi({ 
+        count: data.length, 
+        amount: Number.isFinite(amount) ? amount : 0 
+      });
     } catch (error) {
       setError("Failed to load custom date range data.");
       setCustomKpi(null);
@@ -266,11 +272,13 @@ export default function TransactionsClient() {
         };
       }
       if (customKpi) {
+        const safeAmount = Number.isFinite(customKpi.amount) ? customKpi.amount : 0;
+        const safeCount = Number.isFinite(customKpi.count) ? customKpi.count : 0;
         return {
           label: customStartDate && customEndDate 
             ? `${new Date(customStartDate).toLocaleDateString()} - ${new Date(customEndDate).toLocaleDateString()}`
             : "Custom Range",
-          current: customKpi,
+          current: { count: safeCount, amount: safeAmount },
           previous: { count: 0, amount: 0 }, // No comparison for custom range
         };
       }
@@ -311,12 +319,16 @@ export default function TransactionsClient() {
     return Math.round(delta * 10) / 10;
   }, [currentKpi, kpiRange]);
 
-  const formatMoney = (value: number) =>
-    new Intl.NumberFormat("en-KE", {
+  const formatMoney = (value: number) => {
+    if (!Number.isFinite(value) || isNaN(value)) {
+      return "Ksh 0";
+    }
+    return new Intl.NumberFormat("en-KE", {
       style: "currency",
       currency: "KES",
       maximumFractionDigits: 0,
     }).format(value);
+  };
 
   return (
     <div>
@@ -377,11 +389,13 @@ export default function TransactionsClient() {
                 background: "var(--card-bg, #1a1a2e)",
                 border: "1px solid var(--border-color, #333)",
                 borderRadius: "0.5rem",
-                zIndex: 1000,
+                zIndex: 10000,
                 display: "flex",
                 flexDirection: "column",
                 gap: "0.75rem",
-                minWidth: "250px"
+                minWidth: "250px",
+                boxShadow: "0 10px 30px rgba(0, 0, 0, 0.5)",
+                backdropFilter: "blur(8px)"
               }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                   <label style={{ fontSize: "0.875rem", color: "var(--text-muted, #999)" }}>
