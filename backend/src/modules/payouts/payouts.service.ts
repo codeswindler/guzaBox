@@ -242,35 +242,43 @@ export class PayoutsService {
   }
 
   async getDailyCollections() {
-    const { startToday } = this.getNairobiDayBounds();
-    const todayDateStr = this.formatDateForGrouping(startToday);
-    
-    // Get all unique dates from transactions (grouped by date in Nairobi timezone)
-    const dateRows = await this.paymentRepo
-      .createQueryBuilder("tx")
-      .select("DATE(CONVERT_TZ(tx.createdAt, '+00:00', '+03:00'))", "date")
-      .where("tx.status = :status", { status: "PAID" })
-      .groupBy("date")
-      .orderBy("date", "DESC")
-      .getRawMany();
-
-    const collections = [];
-
-    for (const row of dateRows) {
-      const dateStr = row.date;
-      const dateStart = this.getDateBounds(dateStr).start;
-      const dateEnd = this.getDateBounds(dateStr).end;
-
-      // Get total collected for this day
-      const collectedRow = await this.paymentRepo
-        .createQueryBuilder("tx")
-        .select("SUM(tx.amount)", "amount")
-        .where("tx.status = :status", { status: "PAID" })
-        .andWhere("tx.createdAt >= :start", { start: dateStart })
-        .andWhere("tx.createdAt < :end", { end: dateEnd })
-        .getRawOne();
+    try {
+      const { startToday } = this.getNairobiDayBounds();
+      const todayDateStr = this.formatDateForGrouping(startToday);
       
-      const totalCollected = Number(collectedRow?.amount ?? 0);
+      // Get all paid transactions to group by date in application code
+      // This avoids CONVERT_TZ which requires MySQL timezone tables
+      const allTransactions = await this.paymentRepo
+        .createQueryBuilder("tx")
+        .where("tx.status = :status", { status: "PAID" })
+        .orderBy("tx.createdAt", "DESC")
+        .getMany();
+
+      // Group transactions by date (Nairobi timezone) in JavaScript
+      const dateMap = new Map<string, typeof allTransactions>();
+      for (const tx of allTransactions) {
+        const nairobiDate = this.formatDateForGrouping(tx.createdAt);
+        if (!dateMap.has(nairobiDate)) {
+          dateMap.set(nairobiDate, []);
+        }
+        dateMap.get(nairobiDate)!.push(tx);
+      }
+
+      // Get unique dates sorted DESC
+      const uniqueDates = Array.from(dateMap.keys()).sort((a, b) => b.localeCompare(a));
+
+      const collections = [];
+
+      for (const dateStr of uniqueDates) {
+        const dateStart = this.getDateBounds(dateStr).start;
+        const dateEnd = this.getDateBounds(dateStr).end;
+
+        // Calculate total collected from grouped transactions (more efficient)
+        const dayTransactions = dateMap.get(dateStr) || [];
+        const totalCollected = dayTransactions.reduce(
+          (sum, tx) => sum + Number(tx.amount || 0),
+          0
+        );
 
       // Get release for this day (instant-win-system)
       const release = await this.releaseRepo
