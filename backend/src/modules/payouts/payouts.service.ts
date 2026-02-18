@@ -318,18 +318,24 @@ export class PayoutsService {
       // Calculate amount retained
       const amountRetained = totalCollected - totalReleased;
 
-      collections.push({
-        date: dateStr,
-        totalCollected,
-        budget,
-        totalReleased,
-        percentage,
-        amountRetained,
-        isToday: dateStr === todayDateStr,
-      });
-    }
+        collections.push({
+          date: dateStr,
+          totalCollected,
+          budget,
+          totalReleased,
+          percentage,
+          amountRetained,
+          isToday: dateStr === todayDateStr,
+        });
+      }
 
-    return collections;
+      return collections;
+    } catch (error) {
+      // Return empty array on error rather than throwing
+      // This prevents the frontend from showing a generic error
+      console.error("Error fetching daily collections:", error);
+      return [];
+    }
   }
 
   private randomBetween(min: number, max: number) {
