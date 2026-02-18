@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Req } from "@nestjs/common";
+import { Body, Controller, Get, Post, Query, Req } from "@nestjs/common";
 import { PayoutsService } from "./payouts.service";
 
 @Controller("payouts")
@@ -49,7 +49,12 @@ export class PayoutsController {
   }
 
   @Get("winners")
-  async listWinners() {
-    return this.payoutsService.listWinners();
+  async listWinners(@Query("instantOnly") instantOnly?: string) {
+    return this.payoutsService.listWinners(instantOnly === "true");
+  }
+
+  @Get("daily-collections")
+  async getDailyCollections() {
+    return this.payoutsService.getDailyCollections();
   }
 }

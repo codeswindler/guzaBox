@@ -4,6 +4,7 @@ import { Between, Repository } from "typeorm";
 import { PayoutRelease } from "./entities/payout-release.entity";
 import { Winner } from "./entities/winner.entity";
 import { PaymentTransaction } from "../payments/entities/payment-transaction.entity";
+import { InstantWinSettings } from "../admin/entities/instant-win-settings.entity";
 
 @Injectable()
 export class PayoutsService {
@@ -13,7 +14,9 @@ export class PayoutsService {
     @InjectRepository(Winner)
     private readonly winnerRepo: Repository<Winner>,
     @InjectRepository(PaymentTransaction)
-    private readonly paymentRepo: Repository<PaymentTransaction>
+    private readonly paymentRepo: Repository<PaymentTransaction>,
+    @InjectRepository(InstantWinSettings)
+    private readonly settingsRepo: Repository<InstantWinSettings>
   ) {}
 
   async previewRelease(input: {
@@ -221,8 +224,104 @@ export class PayoutsService {
     return this.releaseRepo.find({ order: { createdAt: "DESC" } });
   }
 
-  async listWinners() {
-    return this.winnerRepo.find({ order: { createdAt: "DESC" } });
+  async listWinners(instantOnly: boolean = false) {
+    if (!instantOnly) {
+      return this.winnerRepo.find({ 
+        relations: ["transaction", "release"],
+        order: { createdAt: "DESC" } 
+      });
+    }
+    
+    return this.winnerRepo
+      .createQueryBuilder("winner")
+      .leftJoinAndSelect("winner.transaction", "transaction")
+      .leftJoinAndSelect("winner.release", "release")
+      .where("release.createdBy = :createdBy", { createdBy: "instant-win-system" })
+      .orderBy("winner.createdAt", "DESC")
+      .getMany();
+  }
+
+  async getDailyCollections() {
+    const { startToday } = this.getNairobiDayBounds();
+    const todayDateStr = this.formatDateForGrouping(startToday);
+    
+    // Get all unique dates from transactions (grouped by date in Nairobi timezone)
+    const dateRows = await this.paymentRepo
+      .createQueryBuilder("tx")
+      .select("DATE(CONVERT_TZ(tx.createdAt, '+00:00', '+03:00'))", "date")
+      .where("tx.status = :status", { status: "PAID" })
+      .groupBy("date")
+      .orderBy("date", "DESC")
+      .getRawMany();
+
+    const collections = [];
+
+    for (const row of dateRows) {
+      const dateStr = row.date;
+      const dateStart = this.getDateBounds(dateStr).start;
+      const dateEnd = this.getDateBounds(dateStr).end;
+
+      // Get total collected for this day
+      const collectedRow = await this.paymentRepo
+        .createQueryBuilder("tx")
+        .select("SUM(tx.amount)", "amount")
+        .where("tx.status = :status", { status: "PAID" })
+        .andWhere("tx.createdAt >= :start", { start: dateStart })
+        .andWhere("tx.createdAt < :end", { end: dateEnd })
+        .getRawOne();
+      
+      const totalCollected = Number(collectedRow?.amount ?? 0);
+
+      // Get release for this day (instant-win-system)
+      const release = await this.releaseRepo
+        .createQueryBuilder("release")
+        .where("release.createdBy = :createdBy", { createdBy: "instant-win-system" })
+        .andWhere("release.createdAt >= :start", { start: dateStart })
+        .andWhere("release.createdAt < :end", { end: dateEnd })
+        .orderBy("release.createdAt", "DESC")
+        .getOne();
+
+      // Get total released for this day (from instant-win winners)
+      const releasedRow = await this.winnerRepo
+        .createQueryBuilder("winner")
+        .leftJoin("winner.release", "release")
+        .select("SUM(winner.amount)", "amount")
+        .where("release.createdBy = :createdBy", { createdBy: "instant-win-system" })
+        .andWhere("winner.createdAt >= :start", { start: dateStart })
+        .andWhere("winner.createdAt < :end", { end: dateEnd })
+        .getRawOne();
+
+      const totalReleased = Number(releasedRow?.amount ?? 0);
+
+      // Calculate budget: use release.releaseBudget if exists, otherwise calculate from percentage
+      let budget = 0;
+      if (release && release.releaseBudget) {
+        budget = Number(release.releaseBudget);
+      } else {
+        // Get current maxPercentage setting
+        const settings = await this.settingsRepo.findOne({ where: { id: 1 } });
+        const maxPercentage = settings?.maxPercentage ?? 50;
+        budget = (totalCollected * maxPercentage) / 100;
+      }
+
+      // Calculate percentage of collections paid out
+      const percentage = totalCollected > 0 ? (totalReleased / totalCollected) * 100 : 0;
+      
+      // Calculate amount retained
+      const amountRetained = totalCollected - totalReleased;
+
+      collections.push({
+        date: dateStr,
+        totalCollected,
+        budget,
+        totalReleased,
+        percentage,
+        amountRetained,
+        isToday: dateStr === todayDateStr,
+      });
+    }
+
+    return collections;
   }
 
   private randomBetween(min: number, max: number) {
@@ -237,5 +336,51 @@ export class PayoutsService {
     startTomorrow.setDate(startTomorrow.getDate() + 1);
 
     return { startToday, startTomorrow };
+  }
+
+  private getNairobiDayBounds() {
+    const now = new Date();
+    const tzOffsetMs = 3 * 60 * 60 * 1000; // Africa/Nairobi UTC+3
+    const nairobiNow = new Date(now.getTime() + tzOffsetMs);
+    const startNairobi = new Date(
+      nairobiNow.getFullYear(),
+      nairobiNow.getMonth(),
+      nairobiNow.getDate(),
+      0,
+      0,
+      0,
+      0
+    );
+    const endNairobi = new Date(startNairobi);
+    endNairobi.setDate(endNairobi.getDate() + 1);
+    const startUtc = new Date(startNairobi.getTime() - tzOffsetMs);
+    const endUtc = new Date(endNairobi.getTime() - tzOffsetMs);
+    return { startToday: startUtc, startTomorrow: endUtc };
+  }
+
+  private formatDateForGrouping(date: Date): string {
+    const tzOffsetMs = 3 * 60 * 60 * 1000; // Africa/Nairobi UTC+3
+    const nairobiDate = new Date(date.getTime() + tzOffsetMs);
+    const year = nairobiDate.getFullYear();
+    const month = String(nairobiDate.getMonth() + 1).padStart(2, "0");
+    const day = String(nairobiDate.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  private getDateBounds(dateStr: string): { start: Date; end: Date } {
+    // dateStr is in format YYYY-MM-DD (Nairobi timezone)
+    const [year, month, day] = dateStr.split("-").map(Number);
+    const tzOffsetMs = 3 * 60 * 60 * 1000; // Africa/Nairobi UTC+3
+    
+    // Create start of day in Nairobi timezone
+    const startNairobi = new Date(year, month - 1, day, 0, 0, 0, 0);
+    const endNairobi = new Date(startNairobi);
+    endNairobi.setDate(endNairobi.getDate() + 1);
+    
+    // Convert to UTC
+    const startUtc = new Date(startNairobi.getTime() - tzOffsetMs);
+    const endUtc = new Date(endNairobi.getTime() - tzOffsetMs);
+    
+    return { start: startUtc, end: endUtc };
   }
 }

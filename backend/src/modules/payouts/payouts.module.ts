@@ -3,11 +3,12 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { PayoutRelease } from "./entities/payout-release.entity";
 import { Winner } from "./entities/winner.entity";
 import { PaymentTransaction } from "../payments/entities/payment-transaction.entity";
+import { InstantWinSettings } from "../admin/entities/instant-win-settings.entity";
 import { PayoutsService } from "./payouts.service";
 import { PayoutsController } from "./payouts.controller";
 
 @Module({
-  imports: [TypeOrmModule.forFeature([PayoutRelease, Winner, PaymentTransaction])],
+  imports: [TypeOrmModule.forFeature([PayoutRelease, Winner, PaymentTransaction, InstantWinSettings])],
   providers: [PayoutsService],
   controllers: [PayoutsController],
 })

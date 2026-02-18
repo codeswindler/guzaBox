@@ -92,7 +92,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <Link href="/">Overview</Link>
             <Link href="/transactions">Transactions</Link>
             <Link href="/instant-win">Instant Wins</Link>
-            <Link href="/payouts">Payouts</Link>
+            <Link href="/payouts">Collections & Payouts</Link>
             <Link href="/analytics">Analytics</Link>
             <Link href="/simulator">USSD Simulator</Link>
           </nav>
