@@ -84,7 +84,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <div className="brand">
             <span className="brand-mark">KB</span>
             <div>
-              <div className="brand-title">Kwachukua Box</div>
+              <div className="brand-title">Kwachua Box</div>
               <div className="brand-subtitle">Admin Console</div>
             </div>
           </div>

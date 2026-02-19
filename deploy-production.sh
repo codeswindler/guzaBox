@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Kwachukua Box Production Deployment Script
+# Kwachua Box Production Deployment Script
 # For deployment to /var/www/guzabox
 
-echo "🚀 Kwachukua Box Production Deployment"
+echo "🚀 Kwachua Box Production Deployment"
 echo "=================================="
 
 # Set variables

@@ -77,7 +77,7 @@ export class AdvantaSmsService {
         {
           headers: {
             'Content-Type': 'application/json',
-            'User-Agent': 'KwachukuaBox/1.0',
+            'User-Agent': 'KwachuaBox/1.0',
           },
           timeout: 10000, // 10 second timeout
         }
@@ -204,7 +204,7 @@ export class AdvantaSmsService {
   }
 
   async sendWinNotification(phoneNumber: string, amount: number, betId: string): Promise<AdvantaSmsResponse> {
-    const message = `CONGRATULATIONS! You won Ksh ${amount}!\n\nBet ID: ${betId}\n\nYour prize will be sent to your M-Pesa account shortly.\n\nThank you for playing Kwachukua Box!`;
+    const message = `CONGRATULATIONS! You won Ksh ${amount}!\n\nBet ID: ${betId}\n\nYour prize will be sent to your M-Pesa account shortly.\n\nThank you for playing Kwachua Box!`;
     
     return this.send({
       to: phoneNumber,
@@ -213,7 +213,7 @@ export class AdvantaSmsService {
   }
 
   async sendOtp(phoneNumber: string, code: string): Promise<AdvantaSmsResponse> {
-    const message = `Your Kwachukua Box OTP is ${code}. It expires in 5 minutes.`;
+    const message = `Your Kwachua Box OTP is ${code}. It expires in 5 minutes.`;
     
     return this.send({
       to: phoneNumber,

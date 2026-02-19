@@ -35,7 +35,7 @@ Set these variables in your host environment or a local `.env` file:
 - `MPESA_B2C_COMMAND_ID=BusinessPayment`
 - `MPESA_B2C_RESULT_URL=`
 - `MPESA_B2C_TIMEOUT_URL=`
-- `MPESA_B2C_REMARKS=Kwachukua Box instant payout`
+- `MPESA_B2C_REMARKS=Kwachua Box instant payout`
 - `MPESA_B2C_OCCASION=InstantWin`
 
 ## USSD Webhook

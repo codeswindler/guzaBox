@@ -102,7 +102,7 @@ export default function LoginPage() {
         <div className="login-header">
           <span className="brand-mark">KB</span>
           <div>
-            <h1>Kwachukua Box Admin</h1>
+            <h1>Kwachua Box Admin</h1>
             <p>Secure access for live operations.</p>
           </div>
         </div>

@@ -133,7 +133,7 @@ export class PaymentsService {
         PhoneNumber: transaction.phoneNumber,
         CallBackURL: callbackUrl,
         AccountReference: transaction.id,
-        TransactionDesc: "Kwachukua Box Stake",
+        TransactionDesc: "Kwachua Box Stake",
       };
 
       this.logger.log(`STK push payload: ${JSON.stringify(payload, null, 2)}`);
@@ -875,7 +875,7 @@ export class PaymentsService {
       this.configService.get<string>("MPESA_B2C_TIMEOUT_URL") ||
       (publicBaseUrl ? `${publicBaseUrl}/payments/mpesa/b2c/timeout` : "");
     const remarks =
-      this.configService.get<string>("MPESA_B2C_REMARKS") || "Kwachukua Box instant payout";
+      this.configService.get<string>("MPESA_B2C_REMARKS") || "Kwachua Box instant payout";
     const occasion = this.configService.get<string>("MPESA_B2C_OCCASION") || "InstantWin";
 
     if (

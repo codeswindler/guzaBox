@@ -4,7 +4,7 @@ import SeedData from "./SeedData";
 import AppShell from "./AppShell";
 
 export const metadata = {
-  title: "Kwachukua Box Admin",
+  title: "Kwachua Box Admin",
   description: "Admin dashboard",
   icons: {
     icon: '/favicon.ico',

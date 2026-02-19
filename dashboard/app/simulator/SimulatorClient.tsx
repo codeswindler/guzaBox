@@ -6,7 +6,7 @@ import api from "../../lib/api";
 type ToastItem = { id: string; message: string };
 
 export default function SimulatorClient() {
-  const menuText = `Kwachukua Box
+  const menuText = `Kwachua Box
 Stake Between Ksh. 20 and 30
 Chagua Box yako ya Ushindi
 1. Box 1
@@ -225,7 +225,7 @@ Chagua Box yako ya Ushindi
           <div className="simulator-icon">KB</div>
           <div>
             <div className="simulator-heading">USSD Simulator</div>
-            <div className="simulator-subheading">KWACHUKUA BOX - PROTOTYPE v1.0</div>
+            <div className="simulator-subheading">KWACHUA BOX - PROTOTYPE v1.0</div>
           </div>
         </div>
         <div className="simulator-actions">
