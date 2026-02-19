@@ -11,6 +11,7 @@ import { Init1700000000000 } from "../migrations/1700000000000-init";
 import { AddPayoutBudget1700000000001 } from "../migrations/1700000000001-add-payout-budget";
 import { AddPayerName1700000000002 } from "../migrations/1700000000002-add-payer-name";
 import { AddInstantWinSettings1700000000003 } from "../migrations/1700000000003-add-instant-win-settings";
+import { AddAccountReference1700000000004 } from "../migrations/1700000000004-add-account-reference";
 
 export const AppDataSource = new DataSource({
   type: "mariadb",
@@ -35,6 +36,7 @@ export const AppDataSource = new DataSource({
     AddPayoutBudget1700000000001,
     AddPayerName1700000000002,
     AddInstantWinSettings1700000000003,
+    AddAccountReference1700000000004,
   ],
   synchronize: process.env.DB_SYNC === "true",
   logging: process.env.DB_LOGGING === "true",
