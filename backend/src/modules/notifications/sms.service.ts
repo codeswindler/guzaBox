@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import { SmsPayload, SmsProvider } from "./providers/sms-provider";
 import { StubSmsProvider } from "./providers/stub-sms.provider";
 import { AdvantaSmsService } from "./advanta-sms.service";
+import { OnfonSmsService } from "./onfon-sms.service";
 
 @Injectable()
 export class SmsService {
@@ -106,6 +107,8 @@ Dial ${ussdCode} to win more.`;
     switch (providerName) {
       case "advanta":
         return new AdvantaSmsService(this.configService);
+      case "onfon":
+        return new OnfonSmsService(this.configService);
       case "stub":
       default:
         return new StubSmsProvider();
