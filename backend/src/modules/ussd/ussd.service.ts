@@ -5,7 +5,7 @@ import { ConfigService } from "@nestjs/config";
 import { PaymentsService } from "../payments/payments.service";
 import { UssdSession } from "./entities/ussd-session.entity";
 
-const MENU_TEXT = `Lucky Box
+const MENU_TEXT = `Kwachukua Box
 Stake Between Ksh. 20 and 30
 Chagua Box yako ya Ushindi
 1. Box 1

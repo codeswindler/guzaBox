@@ -14,12 +14,12 @@ export class SmsService {
   }
 
   async sendOtp(phone: string, code: string) {
-    const message = `Your Lucky Box OTP is ${code}. It expires in 5 minutes.`;
+    const message = `Your Kwachukua Box OTP is ${code}. It expires in 5 minutes.`;
     await this.sendOrThrow({ to: phone, message });
   }
 
   async sendWinNotification(phoneNumber: string, amount: number, betId: string) {
-    const message = `CONGRATULATIONS! You won Ksh ${amount}!\n\nBet ID: ${betId}\n\nYour prize will be sent to your M-Pesa account shortly.\n\nThank you for playing Lucky Box!`;
+    const message = `CONGRATULATIONS! You won Ksh ${amount}!\n\nBet ID: ${betId}\n\nYour prize will be sent to your M-Pesa account shortly.\n\nThank you for playing Kwachukua Box!`;
     await this.sendOrThrow({ to: phoneNumber, message });
   }
 

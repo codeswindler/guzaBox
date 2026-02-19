@@ -6,7 +6,7 @@ import api from "../../lib/api";
 type ToastItem = { id: string; message: string };
 
 export default function SimulatorClient() {
-  const menuText = `Lucky Box
+  const menuText = `Kwachukua Box
 Stake Between Ksh. 20 and 30
 Chagua Box yako ya Ushindi
 1. Box 1
@@ -222,10 +222,10 @@ Chagua Box yako ya Ushindi
       <p className="subtle">Dial and test the menu flow with a live handset UI.</p>
       <div className="simulator-header">
         <div className="simulator-brand">
-          <div className="simulator-icon">LB</div>
+          <div className="simulator-icon">KB</div>
           <div>
             <div className="simulator-heading">USSD Simulator</div>
-            <div className="simulator-subheading">LUCKY BOX - PROTOTYPE v1.0</div>
+            <div className="simulator-subheading">KWACHUKUA BOX - PROTOTYPE v1.0</div>
           </div>
         </div>
         <div className="simulator-actions">

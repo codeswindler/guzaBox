@@ -66,7 +66,7 @@
 ```
 
 ### 5. Monitoring Setup
-- [ ] PM2 logs are accessible: `sudo -iu wilson pm2 logs luckybox-backend`
+- [ ] PM2 logs are accessible: `sudo -iu wilson pm2 logs kwachukuabox-backend`
 - [ ] Set up alerts for budget overrun warnings (if possible)
 - [ ] Monitor first few transactions closely
 
@@ -82,9 +82,9 @@
 
 1. **Deploy code:**
    ```bash
-   cd /var/www/luckybox && git pull origin main
+   cd /var/www/kwachukuabox && git pull origin main
    cd backend && npm ci && npm run build
-   sudo -iu wilson pm2 restart luckybox-backend --update-env
+   sudo -iu wilson pm2 restart kwachukuabox-backend --update-env
    ```
 
 2. **Verify deployment:**
@@ -96,7 +96,7 @@
    sudo -iu wilson pm2 status
    
    # Check logs for errors
-   sudo -iu wilson pm2 logs luckybox-backend --lines 50
+   sudo -iu wilson pm2 logs kwachukuabox-backend --lines 50
    ```
 
 3. **Enable instant wins (when ready):**
@@ -106,7 +106,7 @@
 4. **Monitor first transactions:**
    ```bash
    # Watch logs in real-time
-   sudo -iu wilson pm2 logs luckybox-backend --lines 0
+   sudo -iu wilson pm2 logs kwachukuabox-backend --lines 0
    
    # Look for:
    # - "budget_overrun_detected" warnings

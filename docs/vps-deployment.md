@@ -9,7 +9,7 @@ ssh wilson@your-vps-ip
 
 ### 2. Navigate to deployment directory and pull latest changes
 ```bash
-cd /var/www/luckybox && git pull origin main
+cd /var/www/kwachukuabox && git pull origin main
 ```
 
 ### 3. Install/Update backend dependencies and build
@@ -21,7 +21,7 @@ npm run build
 
 ### 4. Restart backend with PM2 (as wilson user)
 ```bash
-sudo -iu wilson pm2 restart luckybox-backend
+sudo -iu wilson pm2 restart kwachukuabox-backend
 ```
 
 ### 5. Verify deployment
@@ -33,19 +33,19 @@ curl http://localhost:4000/admin/instant-win/status
 sudo -iu wilson pm2 status
 
 # Check logs
-sudo -iu wilson pm2 logs luckybox-backend --lines 50
+sudo -iu wilson pm2 logs kwachukuabox-backend --lines 50
 ```
 
 ## Full Deployment (First Time or Major Update)
 
 ### 1. Backup current deployment
 ```bash
-sudo cp -r /var/www/luckybox /var/backups/luckybox_backup_$(date +%Y%m%d_%H%M%S)
+sudo cp -r /var/www/kwachukuabox /var/backups/kwachukuabox_backup_$(date +%Y%m%d_%H%M%S)
 ```
 
 ### 2. Pull latest code
 ```bash
-cd /var/www/luckybox
+cd /var/www/kwachukuabox
 git fetch origin
 git pull origin main
 ```
@@ -64,11 +64,11 @@ npm run build
 npm run migration:run
 
 # Restart with PM2 (as wilson user)
-sudo -iu wilson pm2 restart luckybox-backend --update-env
+sudo -iu wilson pm2 restart kwachukuabox-backend --update-env
 
 # Or if starting fresh
-sudo -iu wilson pm2 delete luckybox-backend
-sudo -iu wilson pm2 start npm --name "luckybox-backend" -- run start
+sudo -iu wilson pm2 delete kwachukuabox-backend
+sudo -iu wilson pm2 start npm --name "kwachukuabox-backend" -- run start
 sudo -iu wilson pm2 save
 ```
 
@@ -83,11 +83,11 @@ npm ci
 npm run build
 
 # Restart with PM2 (as wilson user)
-sudo -iu wilson pm2 restart luckybox-frontend
+sudo -iu wilson pm2 restart kwachukuabox-frontend
 
 # Or if starting fresh
-sudo -iu wilson pm2 delete luckybox-frontend
-sudo -iu wilson pm2 start npm --name "luckybox-frontend" -- run start
+sudo -iu wilson pm2 delete kwachukuabox-frontend
+sudo -iu wilson pm2 start npm --name "kwachukuabox-frontend" -- run start
 sudo -iu wilson pm2 save
 ```
 
@@ -119,7 +119,7 @@ chmod +x deploy-production.sh
 
 Make sure your `.env` file in `backend/` is up to date:
 ```bash
-cd /var/www/luckybox/backend
+cd /var/www/kwachukuabox/backend
 nano .env
 ```
 
@@ -134,13 +134,13 @@ Key variables to verify:
 ### Backend won't start
 ```bash
 # Check logs (as wilson user)
-sudo -iu wilson pm2 logs luckybox-backend --lines 100
+sudo -iu wilson pm2 logs kwachukuabox-backend --lines 100
 
 # Check if port is in use
 sudo lsof -i :4000
 
 # Check environment variables
-cd /var/www/luckybox/backend
+cd /var/www/kwachukuabox/backend
 cat .env | grep -v "SECRET\|PASSWORD\|KEY"  # View non-sensitive vars
 ```
 
@@ -153,10 +153,10 @@ sudo -iu wilson pm2 logs luckybox-frontend --lines 100
 sudo lsof -i :3000
 
 # Rebuild if needed
-cd /var/www/luckybox/dashboard
+cd /var/www/kwachukuabox/dashboard
 rm -rf .next
 npm run build
-sudo -iu wilson pm2 restart luckybox-frontend
+sudo -iu wilson pm2 restart kwachukuabox-frontend
 ```
 
 ### Database connection issues
@@ -165,7 +165,7 @@ sudo -iu wilson pm2 restart luckybox-frontend
 mysql -u your_db_user -p your_db_name -e "SELECT 1;"
 
 # Check backend .env has correct DB credentials
-cd /var/www/luckybox/backend
+cd /var/www/kwachukuabox/backend
 grep DB_ .env
 ```
 
@@ -182,9 +182,9 @@ sudo -iu wilson pm2 startup
 ## Quick Update (After Code Changes)
 
 ```bash
-cd /var/www/luckybox && git pull origin main
+cd /var/www/kwachukuabox && git pull origin main
 cd backend && npm ci && npm run build
-sudo -iu wilson pm2 restart luckybox-backend --update-env
+sudo -iu wilson pm2 restart kwachukuabox-backend --update-env
 ```
 
 ## Monitoring
@@ -198,7 +198,7 @@ sudo -iu wilson pm2 monit
 ### View logs
 ```bash
 # Backend logs
-sudo -iu wilson pm2 logs luckybox-backend
+sudo -iu wilson pm2 logs kwachukuabox-backend
 
 # Frontend logs (if applicable)
 sudo -iu wilson pm2 logs luckybox-frontend
@@ -230,10 +230,10 @@ If something goes wrong:
 sudo -iu wilson pm2 stop all
 
 # Restore from backup
-sudo rm -rf /var/www/luckybox
-sudo cp -r /var/backups/luckybox_backup_YYYYMMDD_HHMMSS /var/www/luckybox
+sudo rm -rf /var/www/kwachukuabox
+sudo cp -r /var/backups/kwachukuabox_backup_YYYYMMDD_HHMMSS /var/www/kwachukuabox
 
 # Restart services
-cd /var/www/luckybox/backend
-sudo -iu wilson pm2 restart luckybox-backend
+cd /var/www/kwachukuabox/backend
+sudo -iu wilson pm2 restart kwachukuabox-backend
 ```

@@ -5,7 +5,7 @@ import { UssdSession } from "./entities/ussd-session.entity";
 import { PaymentsService } from "../payments/payments.service";
 import { SmsService } from "../notifications/sms.service";
 
-const MENU_TEXT = `Lucky Box
+const MENU_TEXT = `Kwachukua Box
 Stake Between Ksh. 20 and 30
 Chagua Box yako ya Ushindi
 1. Box 1
@@ -116,7 +116,7 @@ export class UssdNewService {
         session.betId || "N/A"
       );
       
-      return `END 🎉 CONGRATULATIONS! You won Ksh ${selectedBoxValue}!\n\nPrize will be sent to your M-Pesa account shortly.\n\nBet ID: ${session.betId}\n\nThank you for playing Lucky Box!`;
+      return `END 🎉 CONGRATULATIONS! You won Ksh ${selectedBoxValue}!\n\nPrize will be sent to your M-Pesa account shortly.\n\nBet ID: ${session.betId}\n\nThank you for playing Kwachukua Box!`;
     } else {
       session.state = "LOST";
       await this.sessionRepo.save(session);

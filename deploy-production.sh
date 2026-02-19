@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Lucky Box Production Deployment Script
+# Kwachukua Box Production Deployment Script
 # For deployment to /var/www/guzabox
 
-echo "🚀 Lucky Box Production Deployment"
+echo "🚀 Kwachukua Box Production Deployment"
 echo "=================================="
 
 # Set variables

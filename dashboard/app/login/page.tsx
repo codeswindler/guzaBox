@@ -100,9 +100,9 @@ export default function LoginPage() {
       <div className="login-overlay" />
       <div className="login-card">
         <div className="login-header">
-          <span className="brand-mark">LB</span>
+          <span className="brand-mark">KB</span>
           <div>
-            <h1>Lucky Box Admin</h1>
+            <h1>Kwachukua Box Admin</h1>
             <p>Secure access for live operations.</p>
           </div>
         </div>
