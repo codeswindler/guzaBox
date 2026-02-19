@@ -65,14 +65,25 @@ export class PaymentsService {
     return Math.floor(Math.random() * (max - min + 1)) + min;
   }
 
+  private generateAccountReference(): string {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let result = "";
+    for (let i = 0; i < 8; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  }
+
   async createPendingTransaction(input: {
     phoneNumber: string;
     amount: number;
     box: string | null;
     sessionId: string | null;
   }) {
+    const accountRef = this.generateAccountReference();
     const entity = this.paymentRepo.create({
       ...input,
+      accountReference: accountRef,
       status: "PENDING" as any,
     });
     return this.paymentRepo.save(entity);
@@ -132,7 +143,7 @@ export class PaymentsService {
         PartyB: shortcode,
         PhoneNumber: transaction.phoneNumber,
         CallBackURL: callbackUrl,
-        AccountReference: transaction.id,
+        AccountReference: transaction.accountReference || this.generateAccountReference(),
         TransactionDesc: "Kwachua Box Stake",
       };
 

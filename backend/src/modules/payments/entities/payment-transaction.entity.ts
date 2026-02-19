@@ -37,6 +37,9 @@ export class PaymentTransaction {
   @Column({ type: "varchar", length: 255, nullable: true })
   checkoutRequestId!: string | null;
 
+  @Column({ type: "varchar", length: 10, nullable: true })
+  accountReference!: string | null;
+
   @Column({ type: "varchar", length: 255, nullable: true })
   resultCode!: string | null;
 
