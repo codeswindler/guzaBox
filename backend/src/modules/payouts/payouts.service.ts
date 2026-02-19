@@ -224,35 +224,91 @@ export class PayoutsService {
     return this.releaseRepo.find({ order: { createdAt: "DESC" } });
   }
 
-  async listWinners(instantOnly: boolean = false) {
-    if (!instantOnly) {
-      return this.winnerRepo.find({ 
-        relations: ["transaction", "release"],
-        order: { createdAt: "DESC" } 
-      });
-    }
-    
-    return this.winnerRepo
+  async listWinners(options: {
+    instantOnly?: boolean;
+    from?: Date;
+    to?: Date;
+    page?: number;
+    limit?: number;
+  } = {}) {
+    const { instantOnly = false, from, to, page, limit } = options;
+    const queryBuilder = this.winnerRepo
       .createQueryBuilder("winner")
       .leftJoinAndSelect("winner.transaction", "transaction")
-      .leftJoinAndSelect("winner.release", "release")
-      .where("release.createdBy = :createdBy", { createdBy: "instant-win-system" })
-      .orderBy("winner.createdAt", "DESC")
-      .getMany();
+      .leftJoinAndSelect("winner.release", "release");
+
+    if (instantOnly) {
+      queryBuilder.where("release.createdBy = :createdBy", { createdBy: "instant-win-system" });
+    }
+
+    if (from) {
+      queryBuilder.andWhere("winner.createdAt >= :from", { from });
+    }
+    if (to) {
+      const toDate = new Date(to);
+      toDate.setHours(23, 59, 59, 999);
+      queryBuilder.andWhere("winner.createdAt <= :to", { to: toDate });
+    }
+
+    queryBuilder.orderBy("winner.createdAt", "DESC");
+
+    // If pagination is requested
+    if (page !== undefined && limit !== undefined) {
+      const skip = (page - 1) * limit;
+      queryBuilder.skip(skip).take(limit);
+      const [data, total] = await queryBuilder.getManyAndCount();
+      return {
+        data,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      };
+    }
+
+    // Return all results if no pagination
+    const data = await queryBuilder.getMany();
+    return {
+      data,
+      pagination: {
+        page: 1,
+        limit: data.length,
+        total: data.length,
+        totalPages: 1,
+      },
+    };
   }
 
-  async getDailyCollections() {
+  async getDailyCollections(options: {
+    from?: Date;
+    to?: Date;
+    page?: number;
+    limit?: number;
+  } = {}) {
     try {
+      const { from, to, page, limit } = options;
       const { startToday } = this.getNairobiDayBounds();
       const todayDateStr = this.formatDateForGrouping(startToday);
       
-      // Get all paid transactions to group by date in application code
-      // This avoids CONVERT_TZ which requires MySQL timezone tables
-      const allTransactions = await this.paymentRepo
+      // Build query for paid transactions
+      const txQueryBuilder = this.paymentRepo
         .createQueryBuilder("tx")
-        .where("tx.status = :status", { status: "PAID" })
-        .orderBy("tx.createdAt", "DESC")
-        .getMany();
+        .where("tx.status = :status", { status: "PAID" });
+
+      // Apply date filters if provided
+      if (from) {
+        txQueryBuilder.andWhere("tx.createdAt >= :from", { from });
+      }
+      if (to) {
+        const toDate = new Date(to);
+        toDate.setHours(23, 59, 59, 999);
+        txQueryBuilder.andWhere("tx.createdAt <= :to", { to: toDate });
+      }
+
+      txQueryBuilder.orderBy("tx.createdAt", "DESC");
+      const allTransactions = await txQueryBuilder.getMany();
 
       // Group transactions by date (Nairobi timezone) in JavaScript
       const dateMap = new Map<string, typeof allTransactions>();
@@ -265,11 +321,21 @@ export class PayoutsService {
       }
 
       // Get unique dates sorted DESC
-      const uniqueDates = Array.from(dateMap.keys()).sort((a, b) => b.localeCompare(a));
+      let uniqueDates = Array.from(dateMap.keys()).sort((a, b) => b.localeCompare(a));
+
+      // Apply pagination if requested
+      let paginatedDates = uniqueDates;
+      let totalPages = 1;
+      if (page !== undefined && limit !== undefined) {
+        const startIndex = (page - 1) * limit;
+        const endIndex = startIndex + limit;
+        paginatedDates = uniqueDates.slice(startIndex, endIndex);
+        totalPages = Math.ceil(uniqueDates.length / limit);
+      }
 
       const collections = [];
 
-      for (const dateStr of uniqueDates) {
+      for (const dateStr of paginatedDates) {
         const dateStart = this.getDateBounds(dateStr).start;
         const dateEnd = this.getDateBounds(dateStr).end;
 
@@ -329,12 +395,41 @@ export class PayoutsService {
         });
       }
 
-      return collections;
+      // Return with pagination info if pagination was requested
+      if (page !== undefined && limit !== undefined) {
+        return {
+          data: collections,
+          pagination: {
+            page: page || 1,
+            limit: limit || collections.length,
+            total: uniqueDates.length,
+            totalPages,
+          },
+        };
+      }
+
+      return {
+        data: collections,
+        pagination: {
+          page: 1,
+          limit: collections.length,
+          total: collections.length,
+          totalPages: 1,
+        },
+      };
     } catch (error) {
       // Return empty array on error rather than throwing
       // This prevents the frontend from showing a generic error
       console.error("Error fetching daily collections:", error);
-      return [];
+      return {
+        data: [],
+        pagination: {
+          page: 1,
+          limit: 0,
+          total: 0,
+          totalPages: 0,
+        },
+      };
     }
   }
 
