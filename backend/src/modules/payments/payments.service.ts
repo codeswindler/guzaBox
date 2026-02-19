@@ -413,7 +413,7 @@ export class PaymentsService {
           return {
             ok: true,
             won: false,
-            message: "Daily win limit reached",
+            message: "Not eligible for more wins today. Try again tomorrow.",
             capAmount: effectiveBudget,
             remainingBudget,
           };
