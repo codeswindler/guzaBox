@@ -20,11 +20,11 @@ Chagua Box yako ya Ushindi
     []
   );
   const [phoneNumber, setPhoneNumber] = useState("254700000000");
-  const dialText = "*123#";
+  const [dialText, setDialText] = useState("*123#");
   const [inputText, setInputText] = useState("");
   const [history, setHistory] = useState<string[]>([]);
   const [screenText, setScreenText] = useState(menuText);
-  const [mode, setMode] = useState<"dial" | "session">("session");
+  const [mode, setMode] = useState<"dial" | "session">("dial");
   const [showReplyInput, setShowReplyInput] = useState(false);
   const replyInputRef = useRef<HTMLInputElement>(null);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
@@ -32,9 +32,6 @@ Chagua Box yako ya Ushindi
   const [isComplete, setIsComplete] = useState(false);
 
   useEffect(() => {
-    // Auto-start the menu session
-    startSession(dialText);
-    
     // Optional: pull the configured loss message prefix (requires admin JWT).
     // Simulator still works without auth/backend; this just enriches the toast text.
     api
@@ -50,7 +47,6 @@ Chagua Box yako ya Ushindi
       .catch(() => {
         // ignore
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const pushToast = (message: string) => {
@@ -174,7 +170,8 @@ Chagua Box yako ya Ushindi
   };
 
   const handleDial = async () => {
-    // No longer needed - auto-starts
+    startSession(dialText);
+    setInputText("");
   };
 
   const handleSend = async () => {
@@ -191,13 +188,13 @@ Chagua Box yako ya Ushindi
   };
 
   const handleEnd = () => {
+    setMode("dial");
+    setDialText("*123#");
     setInputText("");
     setScreenText(menuText);
     setHistory([]);
     setShowReplyInput(false);
     setIsComplete(false);
-    // Restart session
-    startSession(dialText);
   };
 
   const handleReply = () => {
@@ -210,11 +207,13 @@ Chagua Box yako ya Ushindi
   };
 
   const handleDigitPress = (value: string) => {
-    // No longer needed - no dial mode
+    if (mode === "dial") {
+      setDialText((prev) => `${prev}${value}`);
+    }
   };
 
   const handleDelete = () => {
-    // No longer needed - no dial mode
+    setDialText((prev) => prev.slice(0, -1));
   };
 
   return (
@@ -246,7 +245,7 @@ Chagua Box yako ya Ushindi
             <h4>How to test</h4>
             <ol className="how-to-list">
               <li>
-                Menu starts automatically (USSD code: <span className="pill">{dialText}</span>)
+                Dial <span className="pill">{dialText}</span> on the simulator
               </li>
               <li>Navigate using keypad (Option 1 - 6)</li>
               <li>After selection, payment + SMS are simulated locally</li>
@@ -272,8 +271,74 @@ Chagua Box yako ya Ushindi
                 </span>
               </div>
             </div>
-            <div className="phone-body">
-              <div className="ussd-modal">
+            <div className={`phone-body ${mode === "dial" ? "dialer-only" : ""}`}>
+              {mode === "dial" ? (
+                <div className="dialer-view">
+                  <div className="dialer-keypad">
+                    <div className="dialer-keypad-grid">
+                      {[
+                        ["1", ""],
+                        ["2", "ABC"],
+                        ["3", "DEF"],
+                        ["4", "GHI"],
+                        ["5", "JKL"],
+                        ["6", "MNO"],
+                        ["7", "PQRS"],
+                        ["8", "TUV"],
+                        ["9", "WXYZ"],
+                      ].map(([digit, letters]) => (
+                        <button
+                          key={digit}
+                          className="dialer-key-btn"
+                          onClick={() => handleDigitPress(digit)}
+                        >
+                          <span className="dialer-digit">{digit}</span>
+                          <span className="dialer-letters">{letters}</span>
+                        </button>
+                      ))}
+                      <button
+                        className="dialer-key-btn dialer-symbol"
+                        onClick={() => handleDigitPress("*")}
+                      >
+                        <span className="dialer-symbol-text">*</span>
+                      </button>
+                      <button
+                        className="dialer-key-btn"
+                        onClick={() => handleDigitPress("0")}
+                      >
+                        <span className="brand-mark">KB</span>
+                        <span className="dialer-letters">+</span>
+                      </button>
+                      <button
+                        className="dialer-key-btn dialer-symbol"
+                        onClick={() => handleDigitPress("#")}
+                      >
+                        <span className="dialer-symbol-text">#</span>
+                      </button>
+                    </div>
+                    <div className="dialer-actions-row dialer-actions-center">
+                      <button
+                        className="dialer-call-btn"
+                        onClick={handleDial}
+                        aria-label="Call"
+                      >
+                        <svg
+                          className="dialer-call-icon"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2 4.2 2 2 0 0 1 4 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.7.6 2.5a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.6-1.5a2 2 0 0 1 2.1-.5c.8.3 1.6.5 2.5.6a2 2 0 0 1 1.7 2z" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="ussd-modal">
                   <div className="ussd-card">
                     <div className="ussd-modal-body">
                       <p className="mono">
@@ -292,7 +357,7 @@ Chagua Box yako ya Ushindi
                     )}
                     <div className="ussd-actions ussd-actions-split">
                       <button className="ussd-cancel" onClick={handleEnd}>
-                        Restart
+                        Dismiss
                       </button>
                       <button className="ussd-send" onClick={handleReply}>
                         Reply
@@ -300,6 +365,7 @@ Chagua Box yako ya Ushindi
                     </div>
                   </div>
                 </div>
+              )}
             </div>
             <div className="phone-home">
               <span />
