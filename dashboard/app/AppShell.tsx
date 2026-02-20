@@ -191,7 +191,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <Link href="/instant-win">Instant Wins</Link>
             <Link href="/payouts">Collections & Payouts</Link>
             <Link href="/analytics">Analytics</Link>
-            <Link href="/security">Security</Link>
             <Link href="/simulator">USSD Simulator</Link>
           </nav>
           <div className="profile-menu">
@@ -208,6 +207,26 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </button>
             {menuOpen && (
               <div className="profile-dropdown">
+                <Link
+                  href="/security"
+                  onClick={() => setMenuOpen(false)}
+                  style={{
+                    display: "block",
+                    textDecoration: "none",
+                    color: "#e2e8f0",
+                    padding: "8px 10px",
+                    borderRadius: "8px",
+                    fontWeight: 600,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(56, 189, 248, 0.15)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                  }}
+                >
+                  Security
+                </Link>
                 <button type="button" onClick={logout}>
                   Log out
                 </button>
