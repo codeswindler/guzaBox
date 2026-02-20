@@ -40,11 +40,15 @@ export class OnfonSmsService implements SmsProvider {
 
       const mobile = payload.to.replace(/[^0-9]/g, "");
       const sendUrl = `${this.baseUrl}/SendBulkSMS`;
+      
+      // Trim SenderId to remove any leading/trailing whitespace
+      // Some providers are sensitive to exact formatting
+      const trimmedSenderId = this.senderId.trim();
 
       const requestData = {
         ApiKey: this.apiKey,
         ClientId: this.clientId,
-        SenderId: this.senderId,
+        SenderId: trimmedSenderId,
         MessageParameters: [
           {
             Number: mobile,
@@ -59,13 +63,15 @@ export class OnfonSmsService implements SmsProvider {
           {
             url: sendUrl,
             clientId: this.clientId,
-            senderId: this.senderId,
+            senderId: trimmedSenderId,
+            senderIdLength: trimmedSenderId.length,
+            senderIdBytes: Buffer.from(trimmedSenderId).length,
             mobile,
             messageLength: payload.message.length,
             requestData: {
               ApiKey: "[REDACTED]",
               ClientId: this.clientId,
-              SenderId: this.senderId,
+              SenderId: trimmedSenderId,
               MessageParameters: requestData.MessageParameters,
             },
           },
