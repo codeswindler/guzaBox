@@ -173,9 +173,24 @@ export default function PayoutsPage() {
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr + "T00:00:00");
     return date.toLocaleDateString("en-KE", {
+      timeZone: "Africa/Nairobi",
       year: "numeric",
       month: "short",
       day: "numeric",
+    });
+  };
+
+  const formatDateTime = (dateStr: string | Date) => {
+    const date = typeof dateStr === "string" ? new Date(dateStr) : dateStr;
+    return date.toLocaleString("en-KE", {
+      timeZone: "Africa/Nairobi",
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true,
     });
   };
 
@@ -652,7 +667,7 @@ export default function PayoutsPage() {
                   <td>{formatMoney(winner.amount)}</td>
                   <td>{winner.transaction.box || "—"}</td>
                   <td className="table-muted">
-                    {new Date(winner.createdAt).toLocaleString()}
+                    {formatDateTime(winner.createdAt)}
                   </td>
                 </tr>
               ))

@@ -140,7 +140,7 @@ export default function AnalyticsClient() {
     const timer = setInterval(() => {
       applyMock();
       setToasts((prev) => [
-        `Potential winners updated · ${new Date().toLocaleTimeString()}`,
+        `Potential winners updated · ${new Date().toLocaleTimeString("en-KE", { timeZone: "Africa/Nairobi" })}`,
         `Incoming payment Ksh ${Math.floor(50 + Math.random() * 250)}`,
         ...prev,
       ]);
@@ -159,8 +159,12 @@ export default function AnalyticsClient() {
     if (range !== "daily") return period;
     const date = new Date(period);
     if (Number.isNaN(date.getTime())) return period;
-    const day = date.toLocaleDateString("en-US", { weekday: "short" });
+    const day = date.toLocaleDateString("en-US", { 
+      timeZone: "Africa/Nairobi",
+      weekday: "short" 
+    });
     const dateLabel = date.toLocaleDateString("en-US", {
+      timeZone: "Africa/Nairobi",
       month: "short",
       day: "numeric",
     });

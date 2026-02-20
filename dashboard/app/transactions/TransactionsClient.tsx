@@ -330,6 +330,20 @@ export default function TransactionsClient() {
     }).format(value);
   };
 
+  const formatDateTime = (dateStr: string | Date) => {
+    const date = typeof dateStr === "string" ? new Date(dateStr) : dateStr;
+    return date.toLocaleString("en-KE", {
+      timeZone: "Africa/Nairobi",
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true,
+    });
+  };
+
   return (
     <div>
       <h2 className="page-title">Transactions</h2>
@@ -602,7 +616,7 @@ export default function TransactionsClient() {
                   </span>
                 </td>
                 <td className="table-muted">
-                  {new Date(item.createdAt).toLocaleString()}
+                  {formatDateTime(item.createdAt)}
                 </td>
               </tr>
             ))}
