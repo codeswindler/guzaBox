@@ -126,10 +126,15 @@ export class AuthService {
       phone: admin.phone,
     });
 
-    // Create session if device info is available
+    // Create session if device info is available (non-blocking - don't fail login if session creation fails)
     if (req) {
-      const deviceInfo = this.extractDeviceInfo(req);
-      await this.createSession(admin.id, token, deviceInfo);
+      try {
+        const deviceInfo = this.extractDeviceInfo(req);
+        await this.createSession(admin.id, token, deviceInfo);
+      } catch (error) {
+        // Log error but don't fail login - session tracking is optional
+        console.error("Failed to create session:", error);
+      }
     }
 
     return { token };
