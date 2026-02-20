@@ -34,6 +34,7 @@ import { UssdModule } from "./modules/ussd/ussd.module";
         entities: [
           AdminUser,
           OtpCode,
+          AdminSession,
           UssdSession,
           PaymentTransaction,
           PayoutRelease,
