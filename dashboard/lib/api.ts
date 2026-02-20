@@ -20,9 +20,17 @@ api.interceptors.request.use((config) => {
 });
 
 // Session management methods
-export const getSessions = () => api.get("/auth/sessions");
-export const revokeSession = (sessionId: string) =>
-  api.delete(`/auth/sessions/${sessionId}`);
-export const logout = () => api.post("/auth/logout");
+export const getSessions = (securityKey?: string) => {
+  const params = securityKey ? { securityKey } : {};
+  return api.get("/auth/sessions", { params });
+};
+export const revokeSession = (sessionId: string, securityKey?: string) => {
+  const params = securityKey ? { securityKey } : {};
+  return api.delete(`/auth/sessions/${sessionId}`, { params });
+};
+export const logout = (securityKey?: string) => {
+  const params = securityKey ? { securityKey } : {};
+  return api.post("/auth/logout", null, { params });
+};
 
 export default api;

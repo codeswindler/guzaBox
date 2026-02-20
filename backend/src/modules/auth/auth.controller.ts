@@ -5,7 +5,9 @@ import {
   Get,
   Param,
   Post,
+  Query,
   Req,
+  UnauthorizedException,
   UseGuards,
 } from "@nestjs/common";
 import { Request } from "express";
@@ -40,7 +42,16 @@ export class AuthController {
 
   @Get("sessions")
   @UseGuards(JwtAuthGuard)
-  async getSessions(@Req() req: Request & { user?: { id: string } }) {
+  async getSessions(
+    @Req() req: Request & { user?: { id: string } },
+    @Query("securityKey") securityKey?: string
+  ) {
+    // Verify security page access key
+    const expectedKey = this.authService.getSecurityPageKey();
+    if (expectedKey && securityKey !== expectedKey) {
+      throw new UnauthorizedException("Invalid security page access key");
+    }
+
     const adminId = req.user?.id;
     if (!adminId) {
       throw new Error("User not found in request");
@@ -77,8 +88,15 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   async revokeSession(
     @Param("sessionId") sessionId: string,
-    @Req() req: Request & { user?: { id: string } }
+    @Req() req: Request & { user?: { id: string } },
+    @Query("securityKey") securityKey?: string
   ) {
+    // Verify security page access key
+    const expectedKey = this.authService.getSecurityPageKey();
+    if (expectedKey && securityKey !== expectedKey) {
+      throw new UnauthorizedException("Invalid security page access key");
+    }
+
     const adminId = req.user?.id;
     if (!adminId) {
       throw new Error("User not found in request");
@@ -89,7 +107,16 @@ export class AuthController {
 
   @Post("logout")
   @UseGuards(JwtAuthGuard)
-  async logout(@Req() req: Request & { user?: { id: string } }) {
+  async logout(
+    @Req() req: Request & { user?: { id: string } },
+    @Query("securityKey") securityKey?: string
+  ) {
+    // Verify security page access key (optional for logout, but good to have)
+    const expectedKey = this.authService.getSecurityPageKey();
+    if (expectedKey && securityKey && securityKey !== expectedKey) {
+      throw new UnauthorizedException("Invalid security page access key");
+    }
+
     const adminId = req.user?.id;
     if (!adminId) {
       throw new Error("User not found in request");

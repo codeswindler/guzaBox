@@ -318,6 +318,10 @@ export class AuthService {
     });
   }
 
+  getSecurityPageKey(): string | null {
+    return this.configService.get<string>("SECURITY_PAGE_KEY") || null;
+  }
+
   private hashCode(code: string) {
     return createHash("sha256").update(code).digest("hex");
   }

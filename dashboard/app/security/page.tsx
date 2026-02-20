@@ -44,10 +44,10 @@ export default function SecurityPage() {
   const [showAccessPrompt, setShowAccessPrompt] = useState(true);
   const [accessError, setAccessError] = useState("");
 
-  const loadSessions = async () => {
+  const loadSessions = async (key?: string) => {
     try {
       setError("");
-      const response = await getSessions();
+      const response = await getSessions(key);
       const sessionList = response.data || [];
       setSessions(sessionList);
 
@@ -84,12 +84,20 @@ export default function SecurityPage() {
     return Math.abs(hash).toString(16).substring(0, 32);
   };
 
+  const getSecurityKey = (): string | null => {
+    if (typeof window !== "undefined") {
+      return sessionStorage.getItem("security_page_access");
+    }
+    return null;
+  };
+
   const handleRevokeSession = async (sessionId: string) => {
     if (!confirm("Are you sure you want to revoke this session?")) return;
 
     try {
-      await revokeSession(sessionId);
-      await loadSessions();
+      const key = getSecurityKey();
+      await revokeSession(sessionId, key || undefined);
+      await loadSessions(key || undefined);
     } catch (err: any) {
       alert(err.response?.data?.message || "Failed to revoke session");
     }
@@ -105,13 +113,14 @@ export default function SecurityPage() {
     }
 
     try {
+      const key = getSecurityKey();
       const otherSessions = sessions.filter(
         (s) => s.id !== currentSessionId
       );
       await Promise.all(
-        otherSessions.map((s) => revokeSession(s.id).catch(() => {}))
+        otherSessions.map((s) => revokeSession(s.id, key || undefined).catch(() => {}))
       );
-      await loadSessions();
+      await loadSessions(key || undefined);
     } catch (err: any) {
       alert(err.response?.data?.message || "Failed to revoke sessions");
     }
@@ -155,18 +164,19 @@ export default function SecurityPage() {
     return "Unknown Browser";
   };
 
-  const checkAccessKey = (): boolean => {
+  const checkAccessKey = async (): Promise<boolean> => {
     const key = searchParams.get("key");
     if (key) {
-      const expectedKey = process.env.NEXT_PUBLIC_SECURITY_PAGE_KEY;
-      if (expectedKey && key === expectedKey) {
+      // Validate key with backend
+      try {
+        await getSessions(key);
         if (typeof window !== "undefined") {
           sessionStorage.setItem("security_page_access", key);
         }
         setShowAccessPrompt(false);
         return true;
-      } else {
-        setAccessError("Invalid access key");
+      } catch (err: any) {
+        setAccessError(err.response?.data?.message || "Invalid access key");
         return false;
       }
     }
@@ -174,43 +184,56 @@ export default function SecurityPage() {
     // Check if key is stored in sessionStorage
     if (typeof window !== "undefined") {
       const storedKey = sessionStorage.getItem("security_page_access");
-      const expectedKey = process.env.NEXT_PUBLIC_SECURITY_PAGE_KEY;
-      if (storedKey && expectedKey && storedKey === expectedKey) {
-        setShowAccessPrompt(false);
-        return true;
+      if (storedKey) {
+        // Validate stored key with backend
+        try {
+          await getSessions(storedKey);
+          setShowAccessPrompt(false);
+          return true;
+        } catch (err: any) {
+          // Stored key is invalid, clear it
+          sessionStorage.removeItem("security_page_access");
+          return false;
+        }
       }
     }
     
     return false;
   };
 
-  const handleAccessKeySubmit = (e: React.FormEvent) => {
+  const handleAccessKeySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAccessError("");
-    const expectedKey = process.env.NEXT_PUBLIC_SECURITY_PAGE_KEY;
     
-    if (!expectedKey) {
-      setAccessError("Security page access is not configured");
+    if (!accessKey) {
+      setAccessError("Please enter an access key");
       return;
     }
     
-    if (accessKey === expectedKey) {
+    // Validate key with backend
+    try {
+      await getSessions(accessKey);
       if (typeof window !== "undefined") {
         sessionStorage.setItem("security_page_access", accessKey);
       }
       setShowAccessPrompt(false);
-      loadSessions();
-    } else {
-      setAccessError("Invalid access key");
+      await loadSessions(accessKey);
+    } catch (err: any) {
+      setAccessError(err.response?.data?.message || "Invalid access key");
     }
   };
 
   useEffect(() => {
-    if (checkAccessKey()) {
-      loadSessions();
-      const timer = setInterval(loadSessions, 30000); // Refresh every 30 seconds
-      return () => clearInterval(timer);
-    }
+    const init = async () => {
+      const hasAccess = await checkAccessKey();
+      if (hasAccess) {
+        const key = getSecurityKey();
+        await loadSessions(key || undefined);
+        const timer = setInterval(() => loadSessions(key || undefined), 30000); // Refresh every 30 seconds
+        return () => clearInterval(timer);
+      }
+    };
+    init();
   }, [searchParams]);
 
   if (showAccessPrompt) {
