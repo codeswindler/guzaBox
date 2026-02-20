@@ -46,11 +46,15 @@ export class AuthController {
     @Req() req: Request & { user?: { id: string } },
     @Query("securityKey") securityKey?: string
   ) {
-    // Verify security page access key
+    // Verify security page access key (only if configured)
     const expectedKey = this.authService.getSecurityPageKey();
-    if (expectedKey && securityKey !== expectedKey) {
-      throw new UnauthorizedException("Invalid security page access key");
+    if (expectedKey) {
+      // Key is configured, so it's required
+      if (!securityKey || securityKey !== expectedKey) {
+        throw new UnauthorizedException("Invalid security page access key");
+      }
     }
+    // If no key is configured, allow access (for development/testing)
 
     const adminId = req.user?.id;
     if (!adminId) {
@@ -91,10 +95,12 @@ export class AuthController {
     @Req() req: Request & { user?: { id: string } },
     @Query("securityKey") securityKey?: string
   ) {
-    // Verify security page access key
+    // Verify security page access key (only if configured)
     const expectedKey = this.authService.getSecurityPageKey();
-    if (expectedKey && securityKey !== expectedKey) {
-      throw new UnauthorizedException("Invalid security page access key");
+    if (expectedKey) {
+      if (!securityKey || securityKey !== expectedKey) {
+        throw new UnauthorizedException("Invalid security page access key");
+      }
     }
 
     const adminId = req.user?.id;
@@ -111,7 +117,7 @@ export class AuthController {
     @Req() req: Request & { user?: { id: string } },
     @Query("securityKey") securityKey?: string
   ) {
-    // Verify security page access key (optional for logout, but good to have)
+    // Verify security page access key (only if configured, optional for logout)
     const expectedKey = this.authService.getSecurityPageKey();
     if (expectedKey && securityKey && securityKey !== expectedKey) {
       throw new UnauthorizedException("Invalid security page access key");
