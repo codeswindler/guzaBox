@@ -9,6 +9,7 @@ build/
 .idea/
 .vscode/
 *.log
+*.tsbuildinfo
 # M-Pesa certificates (keep secure, never commit)
 backend/certs/
 **/*.cer
