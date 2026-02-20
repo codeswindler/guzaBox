@@ -60,32 +60,43 @@ export class AuthController {
     if (!adminId) {
       throw new Error("User not found in request");
     }
-    const sessions = await this.authService.getActiveSessions(adminId);
-    const now = new Date();
-    return sessions.map((session) => {
-      const deviceInfo = JSON.parse(session.deviceInfo);
-      const createdAt = new Date(session.createdAt);
-      const lastActivityAt = new Date(session.lastActivityAt);
-      // Calculate uptime (time since session was created)
-      const uptimeMs = now.getTime() - createdAt.getTime();
-      const uptimeHours = Math.floor(uptimeMs / (1000 * 60 * 60));
-      const uptimeMinutes = Math.floor((uptimeMs % (1000 * 60 * 60)) / (1000 * 60));
-      const uptimeStr = uptimeHours > 0 
-        ? `${uptimeHours}h ${uptimeMinutes}m`
-        : `${uptimeMinutes}m`;
-      
-      return {
-        id: session.id,
-        deviceInfo,
-        ip: deviceInfo.ip,
-        userAgent: deviceInfo.userAgent,
-        location: deviceInfo.location || null,
-        lastActivityAt: session.lastActivityAt,
-        createdAt: session.createdAt,
-        uptime: uptimeStr,
-        uptimeMs,
-      };
-    });
+    
+    try {
+      const sessions = await this.authService.getActiveSessions(adminId);
+      const now = new Date();
+      return sessions.map((session) => {
+        const deviceInfo = JSON.parse(session.deviceInfo);
+        const createdAt = new Date(session.createdAt);
+        const lastActivityAt = new Date(session.lastActivityAt);
+        // Calculate uptime (time since session was created)
+        const uptimeMs = now.getTime() - createdAt.getTime();
+        const uptimeHours = Math.floor(uptimeMs / (1000 * 60 * 60));
+        const uptimeMinutes = Math.floor((uptimeMs % (1000 * 60 * 60)) / (1000 * 60));
+        const uptimeStr = uptimeHours > 0 
+          ? `${uptimeHours}h ${uptimeMinutes}m`
+          : `${uptimeMinutes}m`;
+        
+        return {
+          id: session.id,
+          deviceInfo,
+          ip: deviceInfo.ip,
+          userAgent: deviceInfo.userAgent,
+          location: deviceInfo.location || null,
+          lastActivityAt: session.lastActivityAt,
+          createdAt: session.createdAt,
+          uptime: uptimeStr,
+          uptimeMs,
+        };
+      });
+    } catch (error: any) {
+      // If table doesn't exist or other database error, return empty array
+      // This allows the page to load even if migration hasn't run yet
+      if (error?.message?.includes("doesn't exist") || error?.code === "ER_NO_SUCH_TABLE") {
+        return [];
+      }
+      // Re-throw other errors
+      throw error;
+    }
   }
 
   @Delete("sessions/:sessionId")
