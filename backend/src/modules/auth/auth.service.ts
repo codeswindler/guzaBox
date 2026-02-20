@@ -229,9 +229,9 @@ export class AuthService {
           location: locationParts.join(", ") || data.country || "Unknown",
         };
       }
-    } catch (error) {
+    } catch (error: any) {
       // Silently fail - location is optional
-      console.error(`Failed to get location for IP ${ip}:`, error.message);
+      console.error(`Failed to get location for IP ${ip}:`, error?.message || String(error));
     }
 
     return null;
