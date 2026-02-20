@@ -5,6 +5,7 @@ import { ConfigService } from "@nestjs/config";
 import { Repository } from "typeorm";
 import { createHash, randomInt } from "crypto";
 import { Request } from "express";
+import axios from "axios";
 import { AdminUser } from "./entities/admin-user.entity";
 import { OtpCode } from "./entities/otp-code.entity";
 import { AdminSession } from "./entities/admin-session.entity";
@@ -174,6 +175,68 @@ export class AuthService {
     };
   }
 
+  async getLocationFromIp(ip: string): Promise<{
+    city?: string;
+    region?: string;
+    country?: string;
+    countryCode?: string;
+    location?: string;
+  } | null> {
+    // Skip localhost and private IPs
+    if (
+      ip === "Unknown" ||
+      ip === "127.0.0.1" ||
+      ip.startsWith("192.168.") ||
+      ip.startsWith("10.") ||
+      ip.startsWith("172.16.") ||
+      ip.startsWith("172.17.") ||
+      ip.startsWith("172.18.") ||
+      ip.startsWith("172.19.") ||
+      ip.startsWith("172.20.") ||
+      ip.startsWith("172.21.") ||
+      ip.startsWith("172.22.") ||
+      ip.startsWith("172.23.") ||
+      ip.startsWith("172.24.") ||
+      ip.startsWith("172.25.") ||
+      ip.startsWith("172.26.") ||
+      ip.startsWith("172.27.") ||
+      ip.startsWith("172.28.") ||
+      ip.startsWith("172.29.") ||
+      ip.startsWith("172.30.") ||
+      ip.startsWith("172.31.")
+    ) {
+      return null;
+    }
+
+    try {
+      // Use ip-api.com (free, no API key required)
+      const response = await axios.get(`http://ip-api.com/json/${ip}`, {
+        timeout: 3000, // 3 second timeout
+      });
+
+      if (response.data && response.data.status === "success") {
+        const data = response.data;
+        const locationParts = [];
+        if (data.city) locationParts.push(data.city);
+        if (data.regionName) locationParts.push(data.regionName);
+        if (data.country) locationParts.push(data.country);
+
+        return {
+          city: data.city,
+          region: data.regionName,
+          country: data.country,
+          countryCode: data.countryCode,
+          location: locationParts.join(", ") || data.country || "Unknown",
+        };
+      }
+    } catch (error) {
+      // Silently fail - location is optional
+      console.error(`Failed to get location for IP ${ip}:`, error.message);
+    }
+
+    return null;
+  }
+
   async createSession(
     adminId: string,
     token: string,
@@ -181,13 +244,26 @@ export class AuthService {
   ): Promise<AdminSession> {
     const tokenHash = createHash("sha256").update(token).digest("hex");
 
-    const session = this.sessionRepo.create({
+    // Fetch location asynchronously (don't block session creation)
+    let location = null;
+    try {
+      location = await this.getLocationFromIp(deviceInfo.ip);
+    } catch (error) {
+      // Ignore errors - location is optional
+    }
+
+    const sessionData: any = {
       adminId,
       tokenHash,
-      deviceInfo: JSON.stringify(deviceInfo),
+      deviceInfo: JSON.stringify({
+        ...deviceInfo,
+        location,
+      }),
       lastActivityAt: new Date(),
       isActive: true,
-    });
+    };
+
+    const session = this.sessionRepo.create(sessionData);
 
     return await this.sessionRepo.save(session);
   }

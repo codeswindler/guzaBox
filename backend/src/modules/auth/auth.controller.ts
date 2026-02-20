@@ -64,6 +64,7 @@ export class AuthController {
         deviceInfo,
         ip: deviceInfo.ip,
         userAgent: deviceInfo.userAgent,
+        location: deviceInfo.location || null,
         lastActivityAt: session.lastActivityAt,
         createdAt: session.createdAt,
         uptime: uptimeStr,

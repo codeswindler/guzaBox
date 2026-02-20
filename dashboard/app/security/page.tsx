@@ -10,9 +10,23 @@ type Session = {
     userAgent: string;
     ip: string;
     deviceFingerprint: string;
+    location?: {
+      city?: string;
+      region?: string;
+      country?: string;
+      countryCode?: string;
+      location?: string;
+    } | null;
   };
   ip: string;
   userAgent: string;
+  location: {
+    city?: string;
+    region?: string;
+    country?: string;
+    countryCode?: string;
+    location?: string;
+  } | null;
   lastActivityAt: string;
   createdAt: string;
   uptime: string;
@@ -296,6 +310,7 @@ export default function SecurityPage() {
                   <tr>
                     <th>Device</th>
                     <th>IP Address</th>
+                    <th>Location</th>
                     <th>Uptime</th>
                     <th>Last Activity</th>
                     <th>Actions</th>
@@ -329,6 +344,9 @@ export default function SecurityPage() {
                         </div>
                       </td>
                       <td className="mono">{session.ip || session.deviceInfo.ip}</td>
+                      <td className="table-muted">
+                        {session.location?.location || session.deviceInfo.location?.location || "—"}
+                      </td>
                       <td className="table-muted">{session.uptime}</td>
                       <td className="table-muted">
                         {formatDateTime(session.lastActivityAt)}
