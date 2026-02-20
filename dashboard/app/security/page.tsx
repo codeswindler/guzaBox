@@ -365,59 +365,96 @@ export default function SecurityPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {sessions.map((session) => (
-                    <tr key={session.id}>
-                      <td>
-                        <div>
-                          <strong>{getDeviceName(session.deviceInfo.userAgent)}</strong>
-                          {session.id === currentSessionId && (
-                            <span
+                  {sessions.map((session) => {
+                    const isCurrent = session.id === currentSessionId;
+                    const loc = session.deviceInfo.location || session.location;
+                    return (
+                      <tr
+                        key={session.id}
+                        style={{
+                          backgroundColor: isCurrent ? "rgba(16, 185, 129, 0.1)" : undefined,
+                          borderLeft: isCurrent ? "3px solid #10b981" : undefined,
+                        }}
+                      >
+                        <td>
+                          <div>
+                            <strong>{getDeviceName(session.deviceInfo.userAgent)}</strong>
+                            {isCurrent && (
+                              <span
+                                style={{
+                                  marginLeft: "8px",
+                                  padding: "2px 8px",
+                                  background: "#10b981",
+                                  color: "white",
+                                  borderRadius: "4px",
+                                  fontSize: "0.75rem",
+                                  fontWeight: "bold",
+                                }}
+                              >
+                                CURRENT
+                              </span>
+                            )}
+                          </div>
+                          <div className="subtle" style={{ fontSize: "0.875rem" }}>
+                            {session.deviceInfo.userAgent.substring(0, 60)}
+                            {session.deviceInfo.userAgent.length > 60 ? "..." : ""}
+                          </div>
+                        </td>
+                        <td className="mono">{session.ip || session.deviceInfo.ip}</td>
+                        <td>
+                          {loc ? (
+                            <div>
+                              <div>
+                                {[
+                                  loc.city,
+                                  loc.zip,
+                                  loc.region,
+                                  loc.country,
+                                ]
+                                  .filter(Boolean)
+                                  .join(", ")}
+                              </div>
+                              {(loc.lat || loc.lon || loc.isp) && (
+                                <div
+                                  className="subtle"
+                                  style={{ fontSize: "0.75rem", marginTop: "4px" }}
+                                >
+                                  {loc.lat &&
+                                    loc.lon &&
+                                    `${loc.lat.toFixed(4)}, ${loc.lon.toFixed(4)}`}
+                                  {loc.isp && ` • ${loc.isp}`}
+                                  {loc.timezone && ` • ${loc.timezone}`}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            "Unknown"
+                          )}
+                        </td>
+                        <td className="table-muted">{session.uptime}</td>
+                        <td className="table-muted">
+                          {formatDateTime(session.lastActivityAt)}
+                        </td>
+                        <td>
+                          {isCurrent ? (
+                            <span className="subtle">Current session</span>
+                          ) : (
+                            <button
+                              className="button"
+                              onClick={() => handleRevokeSession(session.id)}
                               style={{
-                                marginLeft: "8px",
-                                padding: "2px 8px",
-                                background: "#10b981",
-                                color: "white",
-                                borderRadius: "4px",
-                                fontSize: "0.75rem",
-                                fontWeight: "bold",
+                                background: "#ef4444",
+                                padding: "0.25rem 0.75rem",
+                                fontSize: "0.875rem",
                               }}
                             >
-                              CURRENT
-                            </span>
+                              Revoke
+                            </button>
                           )}
-                        </div>
-                        <div className="subtle" style={{ fontSize: "0.875rem" }}>
-                          {session.deviceInfo.userAgent.substring(0, 60)}
-                          {session.deviceInfo.userAgent.length > 60 ? "..." : ""}
-                        </div>
-                      </td>
-                      <td className="mono">{session.ip || session.deviceInfo.ip}</td>
-                      <td className="table-muted">
-                        {session.location?.location || session.deviceInfo.location?.location || "—"}
-                      </td>
-                      <td className="table-muted">{session.uptime}</td>
-                      <td className="table-muted">
-                        {formatDateTime(session.lastActivityAt)}
-                      </td>
-                      <td>
-                        {session.id === currentSessionId ? (
-                          <span className="subtle">Current session</span>
-                        ) : (
-                          <button
-                            className="button"
-                            onClick={() => handleRevokeSession(session.id)}
-                            style={{
-                              background: "#ef4444",
-                              padding: "0.25rem 0.75rem",
-                              fontSize: "0.875rem",
-                            }}
-                          >
-                            Revoke
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             )}
