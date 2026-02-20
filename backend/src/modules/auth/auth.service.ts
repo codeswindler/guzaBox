@@ -180,6 +180,11 @@ export class AuthService {
     region?: string;
     country?: string;
     countryCode?: string;
+    zip?: string;
+    lat?: number;
+    lon?: number;
+    timezone?: string;
+    isp?: string;
     location?: string;
   } | null> {
     // Skip localhost and private IPs
