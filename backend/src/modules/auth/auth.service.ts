@@ -218,6 +218,7 @@ export class AuthService {
         const data = response.data;
         const locationParts = [];
         if (data.city) locationParts.push(data.city);
+        if (data.zip) locationParts.push(data.zip);
         if (data.regionName) locationParts.push(data.regionName);
         if (data.country) locationParts.push(data.country);
 
@@ -226,6 +227,11 @@ export class AuthService {
           region: data.regionName,
           country: data.country,
           countryCode: data.countryCode,
+          zip: data.zip,
+          lat: data.lat,
+          lon: data.lon,
+          timezone: data.timezone,
+          isp: data.isp,
           location: locationParts.join(", ") || data.country || "Unknown",
         };
       }

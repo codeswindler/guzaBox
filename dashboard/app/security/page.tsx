@@ -15,6 +15,11 @@ type Session = {
       region?: string;
       country?: string;
       countryCode?: string;
+      zip?: string;
+      lat?: number;
+      lon?: number;
+      timezone?: string;
+      isp?: string;
       location?: string;
     } | null;
   };
@@ -25,6 +30,11 @@ type Session = {
     region?: string;
     country?: string;
     countryCode?: string;
+    zip?: string;
+    lat?: number;
+    lon?: number;
+    timezone?: string;
+    isp?: string;
     location?: string;
   } | null;
   lastActivityAt: string;

@@ -1,0 +1,60 @@
+#!/usr/bin/env ts-node
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const fs = require("fs");
+const crypto = require("crypto");
+const certPath = process.argv[2];
+const initiatorPassword = process.argv[3];
+if (!certPath || !initiatorPassword) {
+    console.error("Usage: ts-node scripts/generate-b2c-credential.ts <cert-file> <initiator-password>");
+    console.error("\nExample:");
+    console.error('  ts-node scripts/generate-b2c-credential.ts production.cer "MyPassword123"');
+    process.exit(1);
+}
+if (!fs.existsSync(certPath)) {
+    console.error(`Error: Certificate file not found: ${certPath}`);
+    process.exit(1);
+}
+try {
+    let certBuffer = fs.readFileSync(certPath);
+    let certString = certBuffer.toString();
+    if (!certString.includes("-----BEGIN")) {
+        console.log("Detected DER format certificate, converting to PEM...");
+        try {
+            const cert = crypto.createPublicKey({
+                key: certBuffer,
+                format: 'der',
+                type: 'spki'
+            });
+            const exported = cert.export({ format: 'pem', type: 'spki' });
+            certString = typeof exported === 'string' ? exported : exported.toString('utf8');
+            certBuffer = Buffer.from(certString);
+        }
+        catch (derError) {
+            console.error("Failed to auto-convert DER certificate. Please convert manually:");
+            console.error("  openssl x509 -inform DER -in production.cer -out production.pem");
+            console.error("  Then use: ts-node scripts/generate-b2c-credential.ts production.pem \"password\"");
+            throw derError;
+        }
+    }
+    const encrypted = crypto.publicEncrypt({
+        key: certBuffer,
+        padding: crypto.constants.RSA_PKCS1_PADDING,
+    }, Buffer.from(initiatorPassword, "utf8"));
+    const securityCredential = encrypted.toString("base64");
+    console.log("\n✅ SecurityCredential generated successfully!\n");
+    console.log("Add this to your .env file:");
+    console.log(`MPESA_B2C_SECURITY_CREDENTIAL="${securityCredential}"\n`);
+    console.log("⚠️  Keep this credential secure and never commit it to git!\n");
+}
+catch (error) {
+    console.error("Error generating SecurityCredential:");
+    console.error(error.message);
+    if (error.message.includes("PEM") || error.message.includes("key")) {
+        console.error("\nTip: If the certificate is in DER format (.cer), convert it first:");
+        console.error("  openssl x509 -inform DER -in production.cer -out production.pem");
+        console.error("  Then use: ts-node scripts/generate-b2c-credential.ts production.pem \"password\"");
+    }
+    process.exit(1);
+}
+//# sourceMappingURL=generate-b2c-credential.js.map
