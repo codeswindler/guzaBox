@@ -1,42 +1,14 @@
 # Security Page Setup
 
+## Overview
+
+The security page allows administrators to view and manage active sessions, including device information, IP addresses, geolocation, uptime, and the ability to revoke sessions.
+
 ## Environment Variable Configuration
 
-The security page requires an access key to be set in the environment variables.
+The security page requires an access key to be set in the **backend** environment variables only:
 
-### Frontend (Dashboard)
-
-**Option 1: Create `.env.local` file (Recommended)**
-
-```bash
-cd /var/www/kwachuabox/dashboard
-nano .env.local
-```
-
-Add:
-```
-NEXT_PUBLIC_SECURITY_PAGE_KEY=your-secret-key-here
-```
-
-**Option 2: Set as environment variable before build**
-
-```bash
-export NEXT_PUBLIC_SECURITY_PAGE_KEY=your-secret-key-here
-cd /var/www/kwachuabox/dashboard
-npm run build
-```
-
-**Important:** For Next.js, `NEXT_PUBLIC_*` variables are embedded at build time. After setting the variable, you must rebuild:
-
-```bash
-cd /var/www/kwachuabox/dashboard
-npm run build
-sudo -iu wilson pm2 restart kwachuabox-dashboard
-```
-
-### Backend (Optional - for consistency)
-
-The backend also has `SECURITY_PAGE_KEY` in the template, but it's not currently used. You can set it for future use:
+### Backend (.env)
 
 ```bash
 cd /var/www/kwachuabox/backend
@@ -48,10 +20,12 @@ Add:
 SECURITY_PAGE_KEY=your-secret-key-here
 ```
 
-Then restart:
+Then restart the backend:
 ```bash
 sudo -iu wilson pm2 restart kwachuabox-backend --update-env
 ```
+
+**Important:** The key is validated on the backend, so you don't need to set it in the frontend. This is more secure and centralized.
 
 ## Usage
 
@@ -67,9 +41,21 @@ Once configured, access the security page by:
    - Enter the access key when prompted
    - Key is stored in sessionStorage for the current session
 
+## Features
+
+- View all active sessions for your account
+- See device information (browser, OS, user agent)
+- View IP addresses and geolocation (city, region, country)
+- Monitor session uptime (time since login)
+- View last activity timestamp
+- Revoke individual sessions
+- Revoke all other sessions (keep current session)
+- Logout from current session
+
 ## Security Recommendations
 
 - Use a strong, random key (at least 16 characters)
 - Don't commit the key to git
 - Use different keys for different environments if needed
 - Rotate the key periodically
+- The key is validated server-side for security
