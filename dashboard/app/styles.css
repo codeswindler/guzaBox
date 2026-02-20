@@ -90,7 +90,8 @@ html {
   z-index: 10;
 }
 
-.profile-dropdown button {
+.profile-dropdown button,
+.profile-dropdown a {
   width: 100%;
   background: transparent;
   border: 0;
@@ -99,9 +100,13 @@ html {
   border-radius: 8px;
   text-align: left;
   font-weight: 600;
+  cursor: pointer;
+  display: block;
+  text-decoration: none;
 }
 
-.profile-dropdown button:hover {
+.profile-dropdown button:hover,
+.profile-dropdown a:hover {
   background: rgba(56, 189, 248, 0.2);
 }
 
