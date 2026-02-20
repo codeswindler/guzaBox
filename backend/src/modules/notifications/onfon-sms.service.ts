@@ -32,11 +32,31 @@ export class OnfonSmsService implements SmsProvider {
   async send(payload: SmsPayload): Promise<OnfonSmsResponse> {
     try {
       if (!this.accessKey || !this.apiKey || !this.clientId || !this.senderId) {
+        console.error("Onfon SMS credentials check:", {
+          hasAccessKey: !!this.accessKey,
+          hasApiKey: !!this.apiKey,
+          hasClientId: !!this.clientId,
+          hasSenderId: !!this.senderId,
+          accessKeyLength: this.accessKey?.length || 0,
+          apiKeyLength: this.apiKey?.length || 0,
+          clientId: this.clientId,
+          senderId: this.senderId,
+        });
         return {
           status: "failed",
           message: "Onfon SMS credentials are not configured",
         };
       }
+      
+      // Log credential info (without exposing full values) for debugging
+      console.log("Onfon credentials loaded:", {
+        accessKeyLength: this.accessKey.length,
+        accessKeyPrefix: this.accessKey.substring(0, 3) + "...",
+        apiKeyLength: this.apiKey.length,
+        apiKeyPrefix: this.apiKey.substring(0, 3) + "...",
+        clientId: this.clientId,
+        senderId: this.senderId,
+      });
 
       const mobile = payload.to.replace(/[^0-9]/g, "");
       const sendUrl = `${this.baseUrl}/SendBulkSMS`;
