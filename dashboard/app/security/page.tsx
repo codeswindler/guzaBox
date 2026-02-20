@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getSessions, revokeSession, logout as apiLogout } from "../../lib/api";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 type Session = {
   id: string;
@@ -11,16 +11,24 @@ type Session = {
     ip: string;
     deviceFingerprint: string;
   };
+  ip: string;
+  userAgent: string;
   lastActivityAt: string;
   createdAt: string;
+  uptime: string;
+  uptimeMs: number;
 };
 
 export default function SecurityPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [accessKey, setAccessKey] = useState("");
+  const [showAccessPrompt, setShowAccessPrompt] = useState(true);
+  const [accessError, setAccessError] = useState("");
 
   const loadSessions = async () => {
     try {
@@ -133,11 +141,107 @@ export default function SecurityPage() {
     return "Unknown Browser";
   };
 
+  const checkAccessKey = (): boolean => {
+    const key = searchParams.get("key");
+    if (key) {
+      const expectedKey = process.env.NEXT_PUBLIC_SECURITY_PAGE_KEY;
+      if (expectedKey && key === expectedKey) {
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem("security_page_access", key);
+        }
+        setShowAccessPrompt(false);
+        return true;
+      } else {
+        setAccessError("Invalid access key");
+        return false;
+      }
+    }
+    
+    // Check if key is stored in sessionStorage
+    if (typeof window !== "undefined") {
+      const storedKey = sessionStorage.getItem("security_page_access");
+      const expectedKey = process.env.NEXT_PUBLIC_SECURITY_PAGE_KEY;
+      if (storedKey && expectedKey && storedKey === expectedKey) {
+        setShowAccessPrompt(false);
+        return true;
+      }
+    }
+    
+    return false;
+  };
+
+  const handleAccessKeySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setAccessError("");
+    const expectedKey = process.env.NEXT_PUBLIC_SECURITY_PAGE_KEY;
+    
+    if (!expectedKey) {
+      setAccessError("Security page access is not configured");
+      return;
+    }
+    
+    if (accessKey === expectedKey) {
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("security_page_access", accessKey);
+      }
+      setShowAccessPrompt(false);
+      loadSessions();
+    } else {
+      setAccessError("Invalid access key");
+    }
+  };
+
   useEffect(() => {
-    loadSessions();
-    const timer = setInterval(loadSessions, 30000); // Refresh every 30 seconds
-    return () => clearInterval(timer);
-  }, []);
+    if (checkAccessKey()) {
+      loadSessions();
+      const timer = setInterval(loadSessions, 30000); // Refresh every 30 seconds
+      return () => clearInterval(timer);
+    }
+  }, [searchParams]);
+
+  if (showAccessPrompt) {
+    return (
+      <div>
+        <h2 className="page-title">Security</h2>
+        <div className="card demo-card" style={{ maxWidth: "400px", margin: "2rem auto" }}>
+          <h3 style={{ marginTop: 0 }}>Access Required</h3>
+          <p className="subtle">Enter the security page access key to continue.</p>
+          <form onSubmit={handleAccessKeySubmit}>
+            <input
+              type="password"
+              value={accessKey}
+              onChange={(e) => setAccessKey(e.target.value)}
+              placeholder="Enter access key"
+              style={{
+                width: "100%",
+                padding: "0.75rem",
+                marginBottom: "1rem",
+                background: "#2a2a2a",
+                border: "1px solid #444",
+                borderRadius: "6px",
+                color: "white",
+                fontSize: "1rem",
+              }}
+              autoFocus
+            />
+            {accessError && (
+              <p style={{ color: "#ef4444", marginBottom: "1rem" }}>{accessError}</p>
+            )}
+            <button
+              type="submit"
+              className="button"
+              style={{ width: "100%" }}
+            >
+              Access Security Page
+            </button>
+          </form>
+          <p className="subtle" style={{ marginTop: "1rem", fontSize: "0.875rem" }}>
+            You can also access via URL: /security?key=YOUR_KEY
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -192,6 +296,7 @@ export default function SecurityPage() {
                   <tr>
                     <th>Device</th>
                     <th>IP Address</th>
+                    <th>Uptime</th>
                     <th>Last Activity</th>
                     <th>Actions</th>
                   </tr>
@@ -223,7 +328,8 @@ export default function SecurityPage() {
                           {session.deviceInfo.userAgent.length > 60 ? "..." : ""}
                         </div>
                       </td>
-                      <td className="mono">{session.deviceInfo.ip}</td>
+                      <td className="mono">{session.ip || session.deviceInfo.ip}</td>
+                      <td className="table-muted">{session.uptime}</td>
                       <td className="table-muted">
                         {formatDateTime(session.lastActivityAt)}
                       </td>

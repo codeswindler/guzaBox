@@ -46,12 +46,30 @@ export class AuthController {
       throw new Error("User not found in request");
     }
     const sessions = await this.authService.getActiveSessions(adminId);
-    return sessions.map((session) => ({
-      id: session.id,
-      deviceInfo: JSON.parse(session.deviceInfo),
-      lastActivityAt: session.lastActivityAt,
-      createdAt: session.createdAt,
-    }));
+    const now = new Date();
+    return sessions.map((session) => {
+      const deviceInfo = JSON.parse(session.deviceInfo);
+      const createdAt = new Date(session.createdAt);
+      const lastActivityAt = new Date(session.lastActivityAt);
+      // Calculate uptime (time since session was created)
+      const uptimeMs = now.getTime() - createdAt.getTime();
+      const uptimeHours = Math.floor(uptimeMs / (1000 * 60 * 60));
+      const uptimeMinutes = Math.floor((uptimeMs % (1000 * 60 * 60)) / (1000 * 60));
+      const uptimeStr = uptimeHours > 0 
+        ? `${uptimeHours}h ${uptimeMinutes}m`
+        : `${uptimeMinutes}m`;
+      
+      return {
+        id: session.id,
+        deviceInfo,
+        ip: deviceInfo.ip,
+        userAgent: deviceInfo.userAgent,
+        lastActivityAt: session.lastActivityAt,
+        createdAt: session.createdAt,
+        uptime: uptimeStr,
+        uptimeMs,
+      };
+    });
   }
 
   @Delete("sessions/:sessionId")
