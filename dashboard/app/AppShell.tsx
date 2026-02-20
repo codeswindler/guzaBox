@@ -10,34 +10,131 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const isLogin = pathname === "/login";
   const [isReady, setIsReady] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showTimeoutModal, setShowTimeoutModal] = useState(false);
+  const [countdown, setCountdown] = useState(30);
   const inactivityTimer = useRef<number | null>(null);
+  const warningTimer = useRef<number | null>(null);
+  const countdownInterval = useRef<number | null>(null);
+  const resetSessionRef = useRef<(() => void) | null>(null);
   const hasToken =
     typeof window !== "undefined" && Boolean(localStorage.getItem("jazabox_token"));
 
   const logout = () => {
+    // Clear all timers
+    if (inactivityTimer.current) {
+      window.clearTimeout(inactivityTimer.current);
+      inactivityTimer.current = null;
+    }
+    if (warningTimer.current) {
+      window.clearTimeout(warningTimer.current);
+      warningTimer.current = null;
+    }
+    if (countdownInterval.current) {
+      window.clearInterval(countdownInterval.current);
+      countdownInterval.current = null;
+    }
+    setShowTimeoutModal(false);
     localStorage.removeItem("jazabox_token");
     router.replace("/login");
   };
 
+  const resetSession = () => {
+    // Clear all timers
+    if (inactivityTimer.current) {
+      window.clearTimeout(inactivityTimer.current);
+      inactivityTimer.current = null;
+    }
+    if (warningTimer.current) {
+      window.clearTimeout(warningTimer.current);
+      warningTimer.current = null;
+    }
+    if (countdownInterval.current) {
+      window.clearInterval(countdownInterval.current);
+      countdownInterval.current = null;
+    }
+    setShowTimeoutModal(false);
+    setCountdown(30);
+    // Call the reset function from useEffect
+    if (resetSessionRef.current) {
+      resetSessionRef.current();
+    }
+  };
+
   useEffect(() => {
     if (isLogin) return;
-    const resetTimer = () => {
-      if (inactivityTimer.current) {
-        window.clearTimeout(inactivityTimer.current);
-      }
+    
+    const startSessionTimers = () => {
+      // Show warning popup after 4.5 minutes (270 seconds)
+      warningTimer.current = window.setTimeout(() => {
+        setShowTimeoutModal(true);
+        setCountdown(30);
+        
+        // Start countdown
+        countdownInterval.current = window.setInterval(() => {
+          setCountdown((prev) => {
+            if (prev <= 1) {
+              // Time's up, logout
+              if (countdownInterval.current) {
+                window.clearInterval(countdownInterval.current);
+                countdownInterval.current = null;
+              }
+              logout();
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+      }, 4.5 * 60 * 1000); // 4.5 minutes
+
+      // Full logout after 5 minutes
       inactivityTimer.current = window.setTimeout(() => {
         logout();
-      }, 5 * 60 * 1000);
+      }, 5 * 60 * 1000); // 5 minutes
     };
+    
+    const resetTimer = () => {
+      // Clear existing timers
+      if (inactivityTimer.current) {
+        window.clearTimeout(inactivityTimer.current);
+        inactivityTimer.current = null;
+      }
+      if (warningTimer.current) {
+        window.clearTimeout(warningTimer.current);
+        warningTimer.current = null;
+      }
+      if (countdownInterval.current) {
+        window.clearInterval(countdownInterval.current);
+        countdownInterval.current = null;
+      }
+      
+      // Hide modal if user becomes active
+      setShowTimeoutModal(false);
+      setCountdown(30);
+      
+      // Restart timers
+      startSessionTimers();
+    };
+    
+    // Store reset function in ref so resetSession can call it
+    resetSessionRef.current = resetTimer;
 
     const events = ["mousemove", "mousedown", "keydown", "scroll", "touchstart"];
     events.forEach((event) => window.addEventListener(event, resetTimer));
-    resetTimer();
+    startSessionTimers();
 
     return () => {
       events.forEach((event) => window.removeEventListener(event, resetTimer));
       if (inactivityTimer.current) {
         window.clearTimeout(inactivityTimer.current);
+        inactivityTimer.current = null;
+      }
+      if (warningTimer.current) {
+        window.clearTimeout(warningTimer.current);
+        warningTimer.current = null;
+      }
+      if (countdownInterval.current) {
+        window.clearInterval(countdownInterval.current);
+        countdownInterval.current = null;
       }
     };
   }, [isLogin]);
@@ -119,6 +216,107 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </header>
       )}
       <main className={isLogin ? "page login-page" : "page"}>{children}</main>
+      
+      {/* Session Timeout Modal */}
+      {showTimeoutModal && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.75)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 10000,
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#1a1a1a",
+              border: "2px solid #7c3aed",
+              borderRadius: "12px",
+              padding: "32px",
+              maxWidth: "400px",
+              width: "90%",
+              boxShadow: "0 8px 32px rgba(0, 0, 0, 0.5)",
+            }}
+          >
+            <h3
+              style={{
+                marginTop: 0,
+                marginBottom: "16px",
+                color: "#fff",
+                fontSize: "1.5rem",
+                fontWeight: 700,
+              }}
+            >
+              Session Timeout Warning
+            </h3>
+            <p
+              style={{
+                marginBottom: "24px",
+                color: "#ccc",
+                fontSize: "1rem",
+                lineHeight: "1.5",
+              }}
+            >
+              Your session will expire in{" "}
+              <span
+                style={{
+                  color: "#f59e0b",
+                  fontWeight: 700,
+                  fontSize: "1.2rem",
+                }}
+              >
+                {countdown}
+              </span>{" "}
+              seconds due to inactivity.
+            </p>
+            <div
+              style={{
+                display: "flex",
+                gap: "12px",
+                justifyContent: "flex-end",
+              }}
+            >
+              <button
+                type="button"
+                onClick={logout}
+                style={{
+                  padding: "10px 20px",
+                  backgroundColor: "#444",
+                  color: "#fff",
+                  border: "1px solid #666",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  fontSize: "0.9rem",
+                }}
+              >
+                Log Out
+              </button>
+              <button
+                type="button"
+                onClick={resetSession}
+                style={{
+                  padding: "10px 20px",
+                  backgroundColor: "#7c3aed",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  fontSize: "0.9rem",
+                  fontWeight: 600,
+                }}
+              >
+                Stay Logged In
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

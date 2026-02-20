@@ -449,27 +449,50 @@ export class PayoutsService {
 
   private getNairobiDayBounds() {
     const now = new Date();
-    const tzOffsetMs = 3 * 60 * 60 * 1000; // Africa/Nairobi UTC+3
-    const nairobiNow = new Date(now.getTime() + tzOffsetMs);
+    
+    // Get current date/time in Nairobi timezone
+    const nairobiDateStr = now.toLocaleString("en-US", { timeZone: "Africa/Nairobi" });
+    const nairobiDate = new Date(nairobiDateStr);
+    
+    // Get start of day in Nairobi timezone (00:00:00)
     const startNairobi = new Date(
-      nairobiNow.getFullYear(),
-      nairobiNow.getMonth(),
-      nairobiNow.getDate(),
+      nairobiDate.getFullYear(),
+      nairobiDate.getMonth(),
+      nairobiDate.getDate(),
       0,
       0,
       0,
       0
     );
-    const endNairobi = new Date(startNairobi);
-    endNairobi.setDate(endNairobi.getDate() + 1);
-    const startUtc = new Date(startNairobi.getTime() - tzOffsetMs);
-    const endUtc = new Date(endNairobi.getTime() - tzOffsetMs);
+    
+    // Calculate UTC equivalent of Nairobi midnight
+    // Get the offset between local time and Nairobi time
+    const nairobiOffset = this.getNairobiOffset(now);
+    const startUtc = new Date(startNairobi.getTime() - nairobiOffset);
+    
+    // End of day is start of next day
+    const endUtc = new Date(startUtc.getTime() + 24 * 60 * 60 * 1000);
+    
     return { startToday: startUtc, startTomorrow: endUtc };
   }
 
+  private getNairobiOffset(date: Date): number {
+    // Get date string in Nairobi timezone
+    const nairobiStr = date.toLocaleString("en-US", { timeZone: "Africa/Nairobi" });
+    const nairobiDate = new Date(nairobiStr);
+    
+    // Get date string in UTC
+    const utcStr = date.toLocaleString("en-US", { timeZone: "UTC" });
+    const utcDate = new Date(utcStr);
+    
+    // Calculate offset in milliseconds
+    return nairobiDate.getTime() - utcDate.getTime();
+  }
+
   private formatDateForGrouping(date: Date): string {
-    const tzOffsetMs = 3 * 60 * 60 * 1000; // Africa/Nairobi UTC+3
-    const nairobiDate = new Date(date.getTime() + tzOffsetMs);
+    // Convert UTC date to Nairobi timezone
+    const nairobiDateStr = date.toLocaleString("en-US", { timeZone: "Africa/Nairobi" });
+    const nairobiDate = new Date(nairobiDateStr);
     const year = nairobiDate.getFullYear();
     const month = String(nairobiDate.getMonth() + 1).padStart(2, "0");
     const day = String(nairobiDate.getDate()).padStart(2, "0");
@@ -479,16 +502,22 @@ export class PayoutsService {
   private getDateBounds(dateStr: string): { start: Date; end: Date } {
     // dateStr is in format YYYY-MM-DD (Nairobi timezone)
     const [year, month, day] = dateStr.split("-").map(Number);
-    const tzOffsetMs = 3 * 60 * 60 * 1000; // Africa/Nairobi UTC+3
     
-    // Create start of day in Nairobi timezone
-    const startNairobi = new Date(year, month - 1, day, 0, 0, 0, 0);
-    const endNairobi = new Date(startNairobi);
-    endNairobi.setDate(endNairobi.getDate() + 1);
+    // Create a date representing the start of the day in Nairobi
+    // We'll use a reference point to calculate the offset
+    const referenceDate = new Date();
+    const nairobiOffset = this.getNairobiOffset(referenceDate);
     
-    // Convert to UTC
-    const startUtc = new Date(startNairobi.getTime() - tzOffsetMs);
-    const endUtc = new Date(endNairobi.getTime() - tzOffsetMs);
+    // Create UTC date for midnight of the target date
+    const utcMidnight = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+    
+    // Adjust to get Nairobi midnight in UTC
+    // Nairobi is UTC+3, so we subtract 3 hours from UTC to get Nairobi time
+    // But we use the actual offset to handle DST if it ever changes
+    const startUtc = new Date(utcMidnight.getTime() - nairobiOffset);
+    
+    // End of day is 24 hours later
+    const endUtc = new Date(startUtc.getTime() + 24 * 60 * 60 * 1000);
     
     return { start: startUtc, end: endUtc };
   }
