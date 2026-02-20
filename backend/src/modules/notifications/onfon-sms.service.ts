@@ -62,6 +62,12 @@ export class OnfonSmsService implements SmsProvider {
             senderId: this.senderId,
             mobile,
             messageLength: payload.message.length,
+            requestData: {
+              ApiKey: "[REDACTED]",
+              ClientId: this.clientId,
+              SenderId: this.senderId,
+              MessageParameters: requestData.MessageParameters,
+            },
           },
           null,
           2
@@ -78,6 +84,8 @@ export class OnfonSmsService implements SmsProvider {
       });
 
       const result = response.data;
+      console.log("Onfon Media API raw response:", JSON.stringify(result, null, 2));
+      
       const normalized = this.normalizeProviderResult(result);
 
       if (normalized.status === "success") {
@@ -87,28 +95,85 @@ export class OnfonSmsService implements SmsProvider {
         return normalized;
       }
 
-      console.error(`SMS sending failed:`, result);
+      console.error(`SMS sending failed. Full API response:`, JSON.stringify(result, null, 2));
       return normalized;
     } catch (error: any) {
-      console.error(`SMS service error:`, {
+      const errorDetails = {
         message: error.message,
         baseUrl: this.baseUrl,
+        url: `${this.baseUrl}/SendBulkSMS`,
         response: error.response?.data,
         status: error.response?.status,
-      });
+        statusText: error.response?.statusText,
+        headers: error.response?.headers,
+      };
+      
+      console.error(`SMS service error (Onfon Media):`, JSON.stringify(errorDetails, null, 2));
+
+      // Build error message from response data if available
+      let errorMessage = "";
+      
+      if (error.response?.data) {
+        const responseData = error.response.data;
+        
+        // Check for Onfon's ErrorDescription format
+        if (typeof responseData?.ErrorDescription === "string") {
+          errorMessage = responseData.ErrorDescription;
+        } else if (typeof responseData?.errorDescription === "string") {
+          errorMessage = responseData.errorDescription;
+        } else if (typeof responseData?.message === "string") {
+          errorMessage = responseData.message;
+        } else if (typeof responseData?.Message === "string") {
+          errorMessage = responseData.Message;
+        } else {
+          // Include full response if no specific message found
+          errorMessage = `API error: ${JSON.stringify(responseData)}`;
+        }
+        
+        // Include error code if available
+        if (responseData?.ErrorCode !== undefined) {
+          errorMessage = `ErrorCode ${responseData.ErrorCode}: ${errorMessage}`;
+        }
+      }
+      
+      // Fallback to axios error message
+      if (!errorMessage) {
+        errorMessage = error.message || "SMS service unavailable";
+      }
+      
+      // Add HTTP status if available
+      if (error.response?.status) {
+        errorMessage = `HTTP ${error.response.status}: ${errorMessage}`;
+      }
 
       return {
         status: "failed",
-        message:
-          error.response?.data?.message ||
-          error.message ||
-          "SMS service unavailable",
+        message: errorMessage,
       };
     }
   }
 
   private normalizeProviderResult(result: any): OnfonSmsResponse {
-    // Check for success status in various formats
+    // Onfon Media uses ErrorCode format: ErrorCode 0 = Success
+    const errorCode = result?.ErrorCode ?? result?.errorCode;
+    
+    if (errorCode === 0 || errorCode === "0") {
+      // Success - extract message ID from Data array
+      let messageId: string | undefined;
+      
+      if (Array.isArray(result?.Data) && result.Data.length > 0) {
+        messageId = result.Data[0]?.MessageId ?? result.Data[0]?.messageId;
+      }
+      
+      // Also check for messageId at root level
+      if (!messageId) {
+        messageId = result?.messageId ?? result?.MessageId;
+      }
+      
+      return { status: "success", messageId };
+    }
+
+    // Check for success status in various formats (fallback for other response formats)
     const rawStatus =
       typeof result?.status === "string" ? result.status : "";
     const normalizedStatus = rawStatus.toLowerCase().trim();
@@ -151,21 +216,43 @@ export class OnfonSmsService implements SmsProvider {
       return { status: "success", messageId };
     }
 
-    // Fall back to a "failed" result with best-effort reason string
-    const message =
-      typeof result?.message === "string"
-        ? result.message
-        : typeof result?.Message === "string"
-          ? result.Message
-          : typeof result?.error === "string"
-            ? result.error
-            : typeof result?.Error === "string"
-              ? result.Error
-              : typeof result?.description === "string"
-                ? result.description
-                : "Unknown error from Onfon Media SMS";
+    // Build error message from Onfon's ErrorDescription or other fields
+    let errorMessage = "";
+    
+    if (typeof result?.ErrorDescription === "string" && result.ErrorDescription.trim()) {
+      errorMessage = result.ErrorDescription;
+    } else if (typeof result?.errorDescription === "string" && result.errorDescription.trim()) {
+      errorMessage = result.errorDescription;
+    } else if (typeof result?.message === "string" && result.message.trim()) {
+      errorMessage = result.message;
+    } else if (typeof result?.Message === "string" && result.Message.trim()) {
+      errorMessage = result.Message;
+    } else if (typeof result?.error === "string" && result.error.trim()) {
+      errorMessage = result.error;
+    } else if (typeof result?.Error === "string" && result.Error.trim()) {
+      errorMessage = result.Error;
+    } else if (typeof result?.description === "string" && result.description.trim()) {
+      errorMessage = result.description;
+    }
+    
+    // Include error code if available
+    if (errorCode !== undefined && errorCode !== null) {
+      errorMessage = errorMessage 
+        ? `ErrorCode ${errorCode}: ${errorMessage}`
+        : `ErrorCode ${errorCode}`;
+    }
+    
+    // If still no message, include raw response for debugging
+    if (!errorMessage) {
+      const rawResponse = JSON.stringify(result);
+      errorMessage = `Unknown error from Onfon Media SMS. Raw response: ${rawResponse}`;
+    } else {
+      // Append raw response for debugging even when we have an error message
+      const rawResponse = JSON.stringify(result);
+      errorMessage = `${errorMessage} (Raw response: ${rawResponse})`;
+    }
 
-    return { status: "failed", message };
+    return { status: "failed", message: errorMessage };
   }
 
   async sendLossNotification(
