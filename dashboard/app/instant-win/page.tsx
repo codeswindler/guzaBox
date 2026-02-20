@@ -306,33 +306,59 @@ export default function InstantWinPage() {
       {status && (
         <>
           {status.anomaly?.active && (
-            <div
-              className="card demo-card"
-              style={{
-                border: `1px solid ${
-                  status.anomaly.level === "critical" ? "#ef4444" : "#f59e0b"
-                }`,
-                backgroundColor:
-                  status.anomaly.level === "critical" ? "#fee2e2" : "#fef3c7",
-              }}
-            >
-              <p
+            <>
+              <style dangerouslySetInnerHTML={{__html: `
+                @keyframes warningFlash {
+                  0%, 100% { opacity: 1; }
+                  50% { opacity: 0.6; }
+                }
+              `}} />
+              <div
+                className="card demo-card"
                 style={{
-                  fontWeight: 700,
-                  marginBottom: "8px",
-                  color: status.anomaly.level === "critical" ? "#991b1b" : "#92400e",
+                  border: `2px solid ${
+                    status.anomaly.level === "critical" ? "#dc2626" : "#f59e0b"
+                  }`,
+                  backgroundColor:
+                    status.anomaly.level === "critical" ? "#fee2e2" : "#fef3c7",
+                  animation: status.todayStats.budgetUsagePercentage >= 90 
+                    ? "warningFlash 1s ease-in-out infinite" 
+                    : "none",
                 }}
               >
-                {status.anomaly.level === "critical" ? "CRITICAL" : "WARNING"} ·{" "}
-                {status.anomaly.badge}
-              </p>
-              <p style={{ marginBottom: "8px" }}>{status.anomaly.description}</p>
-              {status.anomaly.checks.length > 0 && (
-                <p className="subtle">
-                  Check now: {status.anomaly.checks.join(" | ")}
+                <p
+                  style={{
+                    fontWeight: 700,
+                    marginBottom: "8px",
+                    color: status.anomaly.level === "critical" ? "#991b1b" : "#92400e",
+                    fontSize: "1.1rem",
+                  }}
+                >
+                  {status.anomaly.level === "critical" ? "CRITICAL" : "WARNING"} ·{" "}
+                  {status.anomaly.badge}
                 </p>
-              )}
-            </div>
+                <p 
+                  style={{ 
+                    marginBottom: "8px",
+                    color: status.anomaly.level === "critical" ? "#7f1d1d" : "#78350f",
+                    fontWeight: 500,
+                  }}
+                >
+                  {status.anomaly.description}
+                </p>
+                {status.anomaly.checks.length > 0 && (
+                  <p 
+                    style={{
+                      color: status.anomaly.level === "critical" ? "#991b1b" : "#92400e",
+                      fontSize: "0.9rem",
+                      marginTop: "8px",
+                    }}
+                  >
+                    Check now: {status.anomaly.checks.join(" | ")}
+                  </p>
+                )}
+              </div>
+            </>
           )}
 
           {/* Status Card */}
