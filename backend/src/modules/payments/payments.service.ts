@@ -741,21 +741,24 @@ export class PaymentsService {
 
   private getNairobiDayBounds() {
     const now = new Date();
-    const tzOffsetMs = 3 * 60 * 60 * 1000; // Africa/Nairobi UTC+3
-    const nairobiNow = new Date(now.getTime() + tzOffsetMs);
-    const startNairobi = new Date(
-      nairobiNow.getFullYear(),
-      nairobiNow.getMonth(),
-      nairobiNow.getDate(),
-      0,
-      0,
-      0,
-      0
-    );
-    const endNairobi = new Date(startNairobi);
-    endNairobi.setDate(endNairobi.getDate() + 1);
-    const startUtc = new Date(startNairobi.getTime() - tzOffsetMs);
-    const endUtc = new Date(endNairobi.getTime() - tzOffsetMs);
+    
+    // Get today's date string in Nairobi timezone (YYYY-MM-DD)
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Africa/Nairobi",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    const parts = formatter.formatToParts(now);
+    const year = parseInt(parts.find(p => p.type === "year")!.value);
+    const month = parseInt(parts.find(p => p.type === "month")!.value) - 1; // 0-indexed
+    const day = parseInt(parts.find(p => p.type === "day")!.value);
+    
+    // Nairobi is UTC+3, so midnight in Nairobi = 21:00 UTC previous day
+    // Create UTC date for 21:00 on the previous day
+    const startUtc = new Date(Date.UTC(year, month, day - 1, 21, 0, 0, 0));
+    const endUtc = new Date(startUtc.getTime() + 24 * 60 * 60 * 1000);
+    
     return { startToday: startUtc, startTomorrow: endUtc };
   }
 
