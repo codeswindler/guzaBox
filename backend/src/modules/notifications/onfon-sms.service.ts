@@ -78,7 +78,6 @@ export class OnfonSmsService implements SmsProvider {
         headers: {
           "AccessKey": this.accessKey,
           "Content-Type": "application/json",
-          "User-Agent": "KwachuaBox/1.0",
         },
         timeout: 10000, // 10 second timeout
       });
