@@ -264,8 +264,9 @@ export class AuthService {
     };
 
     const session = this.sessionRepo.create(sessionData);
-
-    return await this.sessionRepo.save(session);
+    const saved = await this.sessionRepo.save(session);
+    // TypeORM save() can return Entity | Entity[], but we're saving a single entity
+    return Array.isArray(saved) ? saved[0] : saved;
   }
 
   async updateSessionActivity(tokenHash: string): Promise<void> {
