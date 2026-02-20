@@ -158,19 +158,38 @@ export class OnfonSmsService implements SmsProvider {
     const errorCode = result?.ErrorCode ?? result?.errorCode;
     
     if (errorCode === 0 || errorCode === "0") {
-      // Success - extract message ID from Data array
-      let messageId: string | undefined;
-      
+      // Check for message-level errors in Data array
+      // Even if ErrorCode is 0, individual messages can fail
       if (Array.isArray(result?.Data) && result.Data.length > 0) {
-        messageId = result.Data[0]?.MessageId ?? result.Data[0]?.messageId;
+        const firstMessage = result.Data[0];
+        const messageErrorCode = firstMessage?.MessageErrorCode ?? firstMessage?.messageErrorCode;
+        
+        // If MessageErrorCode exists and is non-zero, treat as failure
+        if (messageErrorCode !== undefined && messageErrorCode !== null && messageErrorCode !== 0 && messageErrorCode !== "0") {
+          const messageErrorDescription = firstMessage?.MessageErrorDescription ?? firstMessage?.messageErrorDescription ?? "";
+          const errorMessage = messageErrorDescription 
+            ? `MessageErrorCode ${messageErrorCode}: ${messageErrorDescription}`
+            : `MessageErrorCode ${messageErrorCode}`;
+          
+          return { status: "failed", message: errorMessage };
+        }
+        
+        // Success - extract message ID from Data array
+        const messageId = firstMessage?.MessageId ?? firstMessage?.messageId;
+        if (messageId) {
+          return { status: "success", messageId };
+        }
       }
       
       // Also check for messageId at root level
-      if (!messageId) {
-        messageId = result?.messageId ?? result?.MessageId;
+      const messageId = result?.messageId ?? result?.MessageId;
+      if (messageId) {
+        return { status: "success", messageId };
       }
       
-      return { status: "success", messageId };
+      // If ErrorCode is 0 but no message ID found, still treat as success
+      // (some responses might not include MessageId)
+      return { status: "success" };
     }
 
     // Check for success status in various formats (fallback for other response formats)
@@ -217,22 +236,39 @@ export class OnfonSmsService implements SmsProvider {
     }
 
     // Build error message from Onfon's ErrorDescription or other fields
+    // First check Data array for message-level errors
     let errorMessage = "";
     
-    if (typeof result?.ErrorDescription === "string" && result.ErrorDescription.trim()) {
-      errorMessage = result.ErrorDescription;
-    } else if (typeof result?.errorDescription === "string" && result.errorDescription.trim()) {
-      errorMessage = result.errorDescription;
-    } else if (typeof result?.message === "string" && result.message.trim()) {
-      errorMessage = result.message;
-    } else if (typeof result?.Message === "string" && result.Message.trim()) {
-      errorMessage = result.Message;
-    } else if (typeof result?.error === "string" && result.error.trim()) {
-      errorMessage = result.error;
-    } else if (typeof result?.Error === "string" && result.Error.trim()) {
-      errorMessage = result.Error;
-    } else if (typeof result?.description === "string" && result.description.trim()) {
-      errorMessage = result.description;
+    if (Array.isArray(result?.Data) && result.Data.length > 0) {
+      const firstMessage = result.Data[0];
+      const messageErrorDescription = firstMessage?.MessageErrorDescription ?? firstMessage?.messageErrorDescription;
+      const messageErrorCode = firstMessage?.MessageErrorCode ?? firstMessage?.messageErrorCode;
+      
+      if (messageErrorDescription && typeof messageErrorDescription === "string" && messageErrorDescription.trim() && messageErrorDescription !== "null") {
+        errorMessage = messageErrorDescription;
+        if (messageErrorCode !== undefined && messageErrorCode !== null) {
+          errorMessage = `MessageErrorCode ${messageErrorCode}: ${errorMessage}`;
+        }
+      }
+    }
+    
+    // Fallback to root-level error fields
+    if (!errorMessage) {
+      if (typeof result?.ErrorDescription === "string" && result.ErrorDescription.trim() && result.ErrorDescription !== "null") {
+        errorMessage = result.ErrorDescription;
+      } else if (typeof result?.errorDescription === "string" && result.errorDescription.trim() && result.errorDescription !== "null") {
+        errorMessage = result.errorDescription;
+      } else if (typeof result?.message === "string" && result.message.trim()) {
+        errorMessage = result.message;
+      } else if (typeof result?.Message === "string" && result.Message.trim()) {
+        errorMessage = result.Message;
+      } else if (typeof result?.error === "string" && result.error.trim()) {
+        errorMessage = result.error;
+      } else if (typeof result?.Error === "string" && result.Error.trim()) {
+        errorMessage = result.Error;
+      } else if (typeof result?.description === "string" && result.description.trim()) {
+        errorMessage = result.description;
+      }
     }
     
     // Include error code if available
