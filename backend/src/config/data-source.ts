@@ -12,6 +12,8 @@ import { AddPayoutBudget1700000000001 } from "../migrations/1700000000001-add-pa
 import { AddPayerName1700000000002 } from "../migrations/1700000000002-add-payer-name";
 import { AddInstantWinSettings1700000000003 } from "../migrations/1700000000003-add-instant-win-settings";
 import { AddAccountReference1700000000004 } from "../migrations/1700000000004-add-account-reference";
+import { AddAdminSessions1700000000005 } from "../migrations/1700000000005-add-admin-sessions";
+import { AdminSession } from "../modules/auth/entities/admin-session.entity";
 
 export const AppDataSource = new DataSource({
   type: "mariadb",
@@ -24,6 +26,7 @@ export const AppDataSource = new DataSource({
   entities: [
     AdminUser,
     OtpCode,
+    AdminSession,
     UssdSession,
     PaymentTransaction,
     PayoutRelease,
@@ -37,6 +40,7 @@ export const AppDataSource = new DataSource({
     AddPayerName1700000000002,
     AddInstantWinSettings1700000000003,
     AddAccountReference1700000000004,
+    AddAdminSessions1700000000005,
   ],
   synchronize: process.env.DB_SYNC === "true",
   logging: process.env.DB_LOGGING === "true",

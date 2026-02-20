@@ -191,6 +191,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <Link href="/instant-win">Instant Wins</Link>
             <Link href="/payouts">Collections & Payouts</Link>
             <Link href="/analytics">Analytics</Link>
+            <Link href="/security">Security</Link>
             <Link href="/simulator">USSD Simulator</Link>
           </nav>
           <div className="profile-menu">

@@ -4,8 +4,10 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { ConfigService } from "@nestjs/config";
 import { Repository } from "typeorm";
 import { createHash, randomInt } from "crypto";
+import { Request } from "express";
 import { AdminUser } from "./entities/admin-user.entity";
 import { OtpCode } from "./entities/otp-code.entity";
+import { AdminSession } from "./entities/admin-session.entity";
 import { SmsService } from "../notifications/sms.service";
 
 @Injectable()
@@ -15,6 +17,8 @@ export class AuthService {
     private readonly adminRepo: Repository<AdminUser>,
     @InjectRepository(OtpCode)
     private readonly otpRepo: Repository<OtpCode>,
+    @InjectRepository(AdminSession)
+    private readonly sessionRepo: Repository<AdminSession>,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly smsService: SmsService
@@ -58,7 +62,7 @@ export class AuthService {
     return { code, expiresAt };
   }
 
-  async verifyOtp(phone: string, code: string) {
+  async verifyOtp(phone: string, code: string, req?: Request) {
     const admin = await this.adminRepo.findOne({ where: { phone } });
     if (!admin || !admin.isActive) {
       throw new UnauthorizedException("Admin not found or inactive.");
@@ -81,10 +85,16 @@ export class AuthService {
       phone: admin.phone,
     });
 
+    // Create session if device info is available
+    if (req) {
+      const deviceInfo = this.extractDeviceInfo(req);
+      await this.createSession(admin.id, token, deviceInfo);
+    }
+
     return { token };
   }
 
-  async loginWithPassword(identifier: string, password: string) {
+  async loginWithPassword(identifier: string, password: string, req?: Request) {
     const adminPhone = this.configService.get<string>("ADMIN_PHONE") || "";
     const adminEmail = this.configService.get<string>("ADMIN_EMAIL") || "";
     const adminUsername =
@@ -116,7 +126,109 @@ export class AuthService {
       phone: admin.phone,
     });
 
+    // Create session if device info is available
+    if (req) {
+      const deviceInfo = this.extractDeviceInfo(req);
+      await this.createSession(admin.id, token, deviceInfo);
+    }
+
     return { token };
+  }
+
+  extractDeviceInfo(req: Request): {
+    userAgent: string;
+    ip: string;
+    deviceFingerprint: string;
+  } {
+    const userAgent = req.headers["user-agent"] || "Unknown";
+    const forwardedFor = req.headers["x-forwarded-for"];
+    const ip =
+      (Array.isArray(forwardedFor)
+        ? forwardedFor[0]
+        : forwardedFor || req.ip || req.socket.remoteAddress || "Unknown"
+      ).split(",")[0]
+        .trim();
+
+    // Generate device fingerprint from headers
+    const acceptLanguage = req.headers["accept-language"] || "";
+    const fingerprintData = `${ip}|${userAgent}|${acceptLanguage}`;
+    const deviceFingerprint = createHash("sha256")
+      .update(fingerprintData)
+      .digest("hex")
+      .substring(0, 32);
+
+    return {
+      userAgent,
+      ip,
+      deviceFingerprint,
+    };
+  }
+
+  async createSession(
+    adminId: string,
+    token: string,
+    deviceInfo: { userAgent: string; ip: string; deviceFingerprint: string }
+  ): Promise<AdminSession> {
+    const tokenHash = createHash("sha256").update(token).digest("hex");
+
+    const session = this.sessionRepo.create({
+      adminId,
+      tokenHash,
+      deviceInfo: JSON.stringify(deviceInfo),
+      lastActivityAt: new Date(),
+      isActive: true,
+    });
+
+    return await this.sessionRepo.save(session);
+  }
+
+  async updateSessionActivity(tokenHash: string): Promise<void> {
+    const session = await this.sessionRepo.findOne({
+      where: { tokenHash, isActive: true },
+    });
+
+    if (session) {
+      session.lastActivityAt = new Date();
+      await this.sessionRepo.save(session);
+    }
+  }
+
+  async revokeSession(sessionId: string, adminId: string): Promise<void> {
+    const session = await this.sessionRepo.findOne({
+      where: { id: sessionId, adminId },
+    });
+
+    if (session) {
+      session.isActive = false;
+      await this.sessionRepo.save(session);
+    }
+  }
+
+  async revokeAllOtherSessions(
+    currentSessionId: string,
+    adminId: string
+  ): Promise<void> {
+    await this.sessionRepo
+      .createQueryBuilder()
+      .update(AdminSession)
+      .set({ isActive: false })
+      .where("adminId = :adminId", { adminId })
+      .andWhere("isActive = :isActive", { isActive: true })
+      .andWhere("id != :currentSessionId", { currentSessionId })
+      .execute();
+  }
+
+  async getActiveSessions(adminId: string): Promise<AdminSession[]> {
+    return await this.sessionRepo.find({
+      where: { adminId, isActive: true },
+      order: { lastActivityAt: "DESC" },
+    });
+  }
+
+  async getSessionByTokenHash(tokenHash: string): Promise<AdminSession | null> {
+    return await this.sessionRepo.findOne({
+      where: { tokenHash, isActive: true },
+    });
   }
 
   private hashCode(code: string) {

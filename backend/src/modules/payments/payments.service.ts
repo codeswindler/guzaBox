@@ -298,14 +298,11 @@ export class PaymentsService {
         // Calculate new budget based on current collections and percentage
         const newBudget = Math.max(0, (collectedToday * capPercent) / 100);
         
-        // Implement protected budget growth (Option A):
-        // - Always applies new percentage
-        // - Never decreases below what's already been paid
-        // - Never decreases below previous budget cap
-        // - Allows budget to grow as collections increase
+        // Protect retained amount: Always use current budget based on current collections
+        // But ensure we never go below what's already been paid (prevents mid-day reduction)
+        // Never allow effectiveBudget to exceed newBudget (protects retained amount)
         const totalReleased = Number(release?.totalReleased ?? 0);
-        const previousBudget = Number(release?.releaseBudget ?? 0);
-        const effectiveBudget = Math.max(newBudget, totalReleased, previousBudget);
+        const effectiveBudget = Math.max(newBudget, totalReleased);
 
         // Use locked release data for remaining budget (faster and more accurate)
         const remainingBudget = Math.max(effectiveBudget - totalReleased, 0);
@@ -343,7 +340,29 @@ export class PaymentsService {
 
         const prizeAmount = this.randomBetween(minWin, cappedMax);
 
-        // Final safety check: ensure prize doesn't exceed remaining budget
+        // Final safety check: ensure we never exceed current budget (protects retained amount)
+        if (totalReleased + prizeAmount > newBudget) {
+          this.logger.warn(
+            JSON.stringify({
+              event: "prize_would_exceed_budget",
+              prizeAmount,
+              totalReleased,
+              newBudget,
+              remainingBudget,
+              effectiveBudget,
+            })
+          );
+          await this.markSessionLost(manager, transaction.sessionId);
+          return {
+            ok: true,
+            won: false,
+            message: "Budget exhausted",
+            capAmount: effectiveBudget,
+            remainingBudget,
+          };
+        }
+
+        // Additional check: ensure prize doesn't exceed remaining budget
         if (prizeAmount > remainingBudget) {
           this.logger.warn(
             JSON.stringify({
