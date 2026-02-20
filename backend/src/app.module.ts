@@ -6,6 +6,7 @@ import { AnalyticsModule } from "./modules/analytics/analytics.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { AdminUser } from "./modules/auth/entities/admin-user.entity";
 import { OtpCode } from "./modules/auth/entities/otp-code.entity";
+import { AdminSession } from "./modules/auth/entities/admin-session.entity";
 import { InstantWinSettings } from "./modules/admin/entities/instant-win-settings.entity";
 import { PaymentTransaction } from "./modules/payments/entities/payment-transaction.entity";
 import { PaymentsModule } from "./modules/payments/payments.module";
