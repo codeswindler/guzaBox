@@ -181,11 +181,18 @@ export default function PayoutsPage() {
 
   const isLive = (collection: DailyCollection) => {
     if (!collection.isToday) return false;
+    
+    // Get current time in Nairobi timezone (GMT+3)
     const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const nairobiTimeStr = now.toLocaleString("en-US", { timeZone: "Africa/Nairobi" });
+    const nairobiDate = new Date(nairobiTimeStr);
+    
+    // Check if we're still in the same day in Nairobi timezone
+    const today = new Date(nairobiDate.getFullYear(), nairobiDate.getMonth(), nairobiDate.getDate());
     const endOfDay = new Date(today);
     endOfDay.setHours(23, 59, 59, 999);
-    return now < endOfDay;
+    
+    return nairobiDate < endOfDay;
   };
 
   const exportCollectionsToExcel = async () => {

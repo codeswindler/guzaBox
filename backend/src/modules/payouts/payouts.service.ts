@@ -450,30 +450,13 @@ export class PayoutsService {
   private getNairobiDayBounds() {
     const now = new Date();
     
-    // Get current date/time in Nairobi timezone
-    const nairobiDateStr = now.toLocaleString("en-US", { timeZone: "Africa/Nairobi" });
-    const nairobiDate = new Date(nairobiDateStr);
+    // Get today's date string in Nairobi timezone (YYYY-MM-DD)
+    const todayDateStr = this.formatDateForGrouping(now);
     
-    // Get start of day in Nairobi timezone (00:00:00)
-    const startNairobi = new Date(
-      nairobiDate.getFullYear(),
-      nairobiDate.getMonth(),
-      nairobiDate.getDate(),
-      0,
-      0,
-      0,
-      0
-    );
+    // Use getDateBounds to get the UTC boundaries for today
+    const bounds = this.getDateBounds(todayDateStr);
     
-    // Calculate UTC equivalent of Nairobi midnight
-    // Get the offset between local time and Nairobi time
-    const nairobiOffset = this.getNairobiOffset(now);
-    const startUtc = new Date(startNairobi.getTime() - nairobiOffset);
-    
-    // End of day is start of next day
-    const endUtc = new Date(startUtc.getTime() + 24 * 60 * 60 * 1000);
-    
-    return { startToday: startUtc, startTomorrow: endUtc };
+    return { startToday: bounds.start, startTomorrow: bounds.end };
   }
 
   private getNairobiOffset(date: Date): number {
@@ -503,20 +486,47 @@ export class PayoutsService {
     // dateStr is in format YYYY-MM-DD (Nairobi timezone)
     const [year, month, day] = dateStr.split("-").map(Number);
     
-    // Create a date representing the start of the day in Nairobi
-    // We'll use a reference point to calculate the offset
-    const referenceDate = new Date();
-    const nairobiOffset = this.getNairobiOffset(referenceDate);
+    // Use Intl.DateTimeFormat to find what UTC time corresponds to midnight in Nairobi
+    // We'll test different UTC times to find the one that shows 00:00 in Nairobi
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Africa/Nairobi",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
     
-    // Create UTC date for midnight of the target date
-    const utcMidnight = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+    // Start with UTC midnight for the target date
+    let testUtc = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
     
-    // Adjust to get Nairobi midnight in UTC
-    // Nairobi is UTC+3, so we subtract 3 hours from UTC to get Nairobi time
-    // But we use the actual offset to handle DST if it ever changes
-    const startUtc = new Date(utcMidnight.getTime() - nairobiOffset);
+    // Check what time this is in Nairobi
+    let parts = formatter.formatToParts(testUtc);
+    let nairobiHour = parseInt(parts.find(p => p.type === "hour")!.value);
+    let nairobiDay = parseInt(parts.find(p => p.type === "day")!.value);
     
-    // End of day is 24 hours later
+    // If the hour is not 0, adjust. Nairobi is typically UTC+3, so UTC midnight = 3 AM Nairobi
+    // We need to go back 3 hours (or the actual offset) to get Nairobi midnight
+    if (nairobiHour !== 0 || nairobiDay !== day) {
+      // Calculate offset: if testUtc shows 3:00 AM in Nairobi, we need to subtract 3 hours
+      const offsetHours = nairobiHour;
+      testUtc = new Date(testUtc.getTime() - offsetHours * 60 * 60 * 1000);
+      
+      // Verify we got it right
+      parts = formatter.formatToParts(testUtc);
+      nairobiHour = parseInt(parts.find(p => p.type === "hour")!.value);
+      nairobiDay = parseInt(parts.find(p => p.type === "day")!.value);
+      
+      // If still not correct, use a more direct calculation
+      if (nairobiHour !== 0 || nairobiDay !== day) {
+        // Use the known offset: Nairobi is UTC+3 (10800000 ms)
+        // So Nairobi midnight = UTC 21:00 previous day
+        testUtc = new Date(Date.UTC(year, month - 1, day - 1, 21, 0, 0, 0));
+      }
+    }
+    
+    const startUtc = testUtc;
     const endUtc = new Date(startUtc.getTime() + 24 * 60 * 60 * 1000);
     
     return { start: startUtc, end: endUtc };
