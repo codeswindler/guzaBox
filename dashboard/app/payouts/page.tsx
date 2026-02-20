@@ -149,9 +149,13 @@ export default function PayoutsPage() {
   const formatMoney = (value: number | string | null | undefined) => {
     // TypeORM decimal columns are returned as strings in JSON
     // Convert to number if it's a string
+    if (value == null) {
+      return "Ksh 0";
+    }
+    
     const numValue = typeof value === "string" ? parseFloat(value) : value;
     
-    if (!Number.isFinite(numValue) || isNaN(numValue) || numValue == null) {
+    if (!Number.isFinite(numValue) || isNaN(numValue)) {
       return "Ksh 0";
     }
     return new Intl.NumberFormat("en-KE", {
