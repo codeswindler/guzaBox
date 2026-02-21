@@ -175,53 +175,47 @@ export default function SecurityPage() {
   };
 
   const checkAccessKey = async (): Promise<boolean> => {
-    // First, try to access without a key (in case no key is configured)
-    try {
-      await getSessions();
-      // Success - no key required
-      setShowAccessPrompt(false);
-      return true;
-    } catch (err: any) {
-      // If it fails with "Invalid security page access key", key is required
-      const errorMsg = err.response?.data?.message || "";
-      if (errorMsg.includes("Invalid security page access key")) {
-        // Key is required, check URL or sessionStorage
-        const key = searchParams.get("key");
-        if (key) {
-          try {
-            await getSessions(key);
-            if (typeof window !== "undefined") {
-              sessionStorage.setItem("security_page_access", key);
-            }
-            setShowAccessPrompt(false);
-            return true;
-          } catch (err2: any) {
-            setAccessError(err2.response?.data?.message || "Invalid access key");
-            return false;
-          }
-        }
-        
-        // Check sessionStorage
+    // Security page always requires a key
+    const key = searchParams.get("key");
+    if (key) {
+      // Validate key from URL
+      try {
+        await getSessions(key);
         if (typeof window !== "undefined") {
-          const storedKey = sessionStorage.getItem("security_page_access");
-          if (storedKey) {
-            try {
-              await getSessions(storedKey);
-              setShowAccessPrompt(false);
-              return true;
-            } catch (err3: any) {
-              sessionStorage.removeItem("security_page_access");
-              return false;
-            }
-          }
+          sessionStorage.setItem("security_page_access", key);
         }
-        
-        // Key is required but not provided
+        setShowAccessPrompt(false);
+        return true;
+      } catch (err: any) {
+        setAccessError(err.response?.data?.message || "Invalid access key");
         return false;
       }
-      // Other error (e.g., not authenticated)
-      return false;
     }
+    
+    // Check sessionStorage for stored key
+    if (typeof window !== "undefined") {
+      const storedKey = sessionStorage.getItem("security_page_access");
+      if (storedKey) {
+        try {
+          await getSessions(storedKey);
+          setShowAccessPrompt(false);
+          return true;
+        } catch (err: any) {
+          // Stored key is invalid, clear it
+          sessionStorage.removeItem("security_page_access");
+          const errorMsg = err.response?.data?.message || "";
+          if (errorMsg.includes("not configured")) {
+            setAccessError("Security page is not configured. Please contact administrator.");
+          } else {
+            setAccessError("Invalid or expired access key");
+          }
+          return false;
+        }
+      }
+    }
+    
+    // No key provided
+    return false;
   };
 
   const handleAccessKeySubmit = async (e: React.FormEvent) => {

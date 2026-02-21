@@ -46,15 +46,18 @@ export class AuthController {
     @Req() req: Request & { user?: { id: string } },
     @Query("securityKey") securityKey?: string
   ) {
-    // Verify security page access key (only if configured)
+    // Security page always requires a key if configured
     const expectedKey = this.authService.getSecurityPageKey();
     if (expectedKey) {
       // Key is configured, so it's required
       if (!securityKey || securityKey !== expectedKey) {
-        throw new UnauthorizedException("Invalid security page access key");
+        throw new UnauthorizedException("Security page access key required");
       }
+    } else {
+      // If no key is configured, still require some form of access control
+      // Return a message indicating the page needs to be configured
+      throw new UnauthorizedException("Security page is not configured. Please set SECURITY_PAGE_KEY in backend environment.");
     }
-    // If no key is configured, allow access (for development/testing)
 
     const adminId = req.user?.id;
     if (!adminId) {
