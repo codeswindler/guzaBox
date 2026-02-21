@@ -81,7 +81,9 @@ export default function TransactionsClient() {
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
   const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
+  const [datePickerPosition, setDatePickerPosition] = useState({ top: 0, right: 0 });
   const customDatePickerRef = useRef<HTMLDivElement>(null);
+  const customButtonRef = useRef<HTMLButtonElement>(null);
   const lastSeenRef = useRef<string | null>(null);
 
   useClickOutside(customDatePickerRef, () => {
@@ -385,9 +387,17 @@ export default function TransactionsClient() {
           </div>
           <div style={{ position: "relative" }} ref={customDatePickerRef}>
             <button
+              ref={customButtonRef}
               className={kpiRange === "custom" ? "tab active" : "tab"}
               onClick={() => {
                 setKpiRange("custom");
+                if (!showCustomDatePicker && customButtonRef.current) {
+                  const rect = customButtonRef.current.getBoundingClientRect();
+                  setDatePickerPosition({
+                    top: rect.bottom + window.scrollY + 8,
+                    right: window.innerWidth - rect.right
+                  });
+                }
                 setShowCustomDatePicker(!showCustomDatePicker);
               }}
             >
@@ -395,21 +405,20 @@ export default function TransactionsClient() {
             </button>
             {showCustomDatePicker && kpiRange === "custom" && (
               <div style={{
-                position: "absolute",
-                right: 0,
-                top: "100%",
-                marginTop: "0.5rem",
+                position: "fixed",
+                top: `${datePickerPosition.top}px`,
+                right: `${datePickerPosition.right}px`,
                 padding: "1rem",
-                background: "var(--card-bg, #1a1a2e)",
-                border: "1px solid var(--border-color, #333)",
+                background: "rgba(15, 23, 42, 0.98)",
+                border: "1px solid rgba(148, 163, 184, 0.4)",
                 borderRadius: "0.5rem",
-                zIndex: 10000,
+                zIndex: 99999,
                 display: "flex",
                 flexDirection: "column",
                 gap: "0.75rem",
                 minWidth: "250px",
-                boxShadow: "0 10px 30px rgba(0, 0, 0, 0.5)",
-                backdropFilter: "blur(8px)"
+                boxShadow: "0 20px 40px rgba(0, 0, 0, 0.8)",
+                backdropFilter: "blur(12px)"
               }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                   <label style={{ fontSize: "0.875rem", color: "var(--text-muted, #999)" }}>

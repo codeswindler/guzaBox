@@ -945,6 +945,8 @@ td {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  position: relative;
+  z-index: 1;
 }
 
 .kpi-tabs {
