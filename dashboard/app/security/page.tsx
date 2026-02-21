@@ -95,10 +95,8 @@ export default function SecurityPage() {
   };
 
   const getSecurityKey = (): string | null => {
-    if (typeof window !== "undefined") {
-      return sessionStorage.getItem("security_page_access");
-    }
-    return null;
+    // Get key from URL parameter only, not sessionStorage
+    return searchParams.get("key");
   };
 
   const handleRevokeSession = async (sessionId: string) => {
@@ -207,9 +205,9 @@ export default function SecurityPage() {
       await getSessions(accessKey);
       // Don't store in sessionStorage - require key every time
       setShowAccessPrompt(false);
+      // Update URL with key so it persists during this session
+      router.replace(`/security?key=${encodeURIComponent(accessKey)}`);
       await loadSessions(accessKey);
-      // Update URL with key so it persists during navigation
-      router.push(`/security?key=${encodeURIComponent(accessKey)}`);
     } catch (err: any) {
       setAccessError(err.response?.data?.message || "Invalid access key");
     }
