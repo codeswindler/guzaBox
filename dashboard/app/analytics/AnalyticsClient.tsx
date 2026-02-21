@@ -198,6 +198,11 @@ export default function AnalyticsClient() {
                 {overview.today.paidCount} paid · {overview.today.pendingCount} pending ·{" "}
                 {overview.today.failedCount} failed
               </p>
+              {overview.today.retainedAmount !== undefined && (
+                <p className="subtle" style={{ marginTop: "0.5rem", color: "#22c55e", fontWeight: 600 }}>
+                  Retained: {formatMoney(overview.today.retainedAmount)}
+                </p>
+              )}
             </div>
             <div className="card demo-card kpi-tile">
               <p className="kpi-label">Last 7 Days</p>
@@ -208,6 +213,11 @@ export default function AnalyticsClient() {
                 {overview.last7.paidCount} paid · {overview.last7.pendingCount} pending ·{" "}
                 {overview.last7.failedCount} failed
               </p>
+              {overview.last7.retainedAmount !== undefined && (
+                <p className="subtle" style={{ marginTop: "0.5rem", color: "#22c55e", fontWeight: 600 }}>
+                  Retained: {formatMoney(overview.last7.retainedAmount)}
+                </p>
+              )}
             </div>
             <div className="card demo-card kpi-tile">
               <p className="kpi-label">All Time</p>
@@ -218,6 +228,11 @@ export default function AnalyticsClient() {
                 {overview.allTime.paidCount} paid · {overview.allTime.pendingCount} pending ·{" "}
                 {overview.allTime.failedCount} failed
               </p>
+              {overview.allTime.retainedAmount !== undefined && (
+                <p className="subtle" style={{ marginTop: "0.5rem", color: "#22c55e", fontWeight: 600 }}>
+                  Retained: {formatMoney(overview.allTime.retainedAmount)}
+                </p>
+              )}
             </div>
           </>
         ) : (
