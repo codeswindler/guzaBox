@@ -175,15 +175,12 @@ export default function SecurityPage() {
   };
 
   const checkAccessKey = async (): Promise<boolean> => {
-    // Security page always requires a key
+    // Security page always requires a key - check URL parameter only
     const key = searchParams.get("key");
     if (key) {
       // Validate key from URL
       try {
         await getSessions(key);
-        if (typeof window !== "undefined") {
-          sessionStorage.setItem("security_page_access", key);
-        }
         setShowAccessPrompt(false);
         return true;
       } catch (err: any) {
@@ -192,29 +189,7 @@ export default function SecurityPage() {
       }
     }
     
-    // Check sessionStorage for stored key
-    if (typeof window !== "undefined") {
-      const storedKey = sessionStorage.getItem("security_page_access");
-      if (storedKey) {
-        try {
-          await getSessions(storedKey);
-          setShowAccessPrompt(false);
-          return true;
-        } catch (err: any) {
-          // Stored key is invalid, clear it
-          sessionStorage.removeItem("security_page_access");
-          const errorMsg = err.response?.data?.message || "";
-          if (errorMsg.includes("not configured")) {
-            setAccessError("Security page is not configured. Please contact administrator.");
-          } else {
-            setAccessError("Invalid or expired access key");
-          }
-          return false;
-        }
-      }
-    }
-    
-    // No key provided
+    // No key provided - always show prompt
     return false;
   };
 
@@ -230,11 +205,11 @@ export default function SecurityPage() {
     // Validate key with backend
     try {
       await getSessions(accessKey);
-      if (typeof window !== "undefined") {
-        sessionStorage.setItem("security_page_access", accessKey);
-      }
+      // Don't store in sessionStorage - require key every time
       setShowAccessPrompt(false);
       await loadSessions(accessKey);
+      // Update URL with key so it persists during navigation
+      router.push(`/security?key=${encodeURIComponent(accessKey)}`);
     } catch (err: any) {
       setAccessError(err.response?.data?.message || "Invalid access key");
     }
