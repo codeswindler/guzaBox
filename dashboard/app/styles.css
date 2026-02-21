@@ -1212,12 +1212,66 @@ td {
   flex-wrap: wrap;
 }
 
+.filter-row label {
+  color: #cbd5f5;
+  font-weight: 500;
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+.filter-row select {
+  background: rgba(7, 15, 35, 0.7);
+  border: 1px solid rgba(66, 170, 255, 0.2);
+  color: #e6f1ff;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.filter-row select:hover {
+  border-color: rgba(66, 170, 255, 0.4);
+}
+
+.filter-row select:focus {
+  outline: none;
+  border-color: rgba(66, 170, 255, 0.6);
+}
+
 .filter-row input[type="datetime-local"] {
   background: rgba(7, 15, 35, 0.7);
   border: 1px solid rgba(66, 170, 255, 0.2);
   color: #e6f1ff;
   padding: 8px 12px;
   border-radius: 10px;
+  font-size: 0.875rem;
+}
+
+.filter-row input[type="datetime-local"]:hover {
+  border-color: rgba(66, 170, 255, 0.4);
+}
+
+.filter-row input[type="datetime-local"]:focus {
+  outline: none;
+  border-color: rgba(66, 170, 255, 0.6);
+}
+
+.filter-row button {
+  background: rgba(56, 189, 248, 0.2);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  color: #cbd5f5;
+  padding: 8px 16px;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filter-row button:hover {
+  background: rgba(56, 189, 248, 0.3);
+  border-color: rgba(56, 189, 248, 0.5);
+  color: #f8fafc;
 }
 
 .status-pill {
