@@ -2,12 +2,15 @@ import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { PaymentTransaction } from "../payments/entities/payment-transaction.entity";
+import { Winner } from "../payouts/entities/winner.entity";
 
 @Injectable()
 export class AnalyticsService {
   constructor(
     @InjectRepository(PaymentTransaction)
-    private readonly paymentRepo: Repository<PaymentTransaction>
+    private readonly paymentRepo: Repository<PaymentTransaction>,
+    @InjectRepository(Winner)
+    private readonly winnerRepo: Repository<Winner>
   ) {}
 
   async getSummary() {
@@ -156,11 +159,31 @@ export class AnalyticsService {
     }
 
     const row = await qb.getRawOne();
+    const paidAmount = Number(row?.paidAmount ?? 0);
+
+    // Calculate total released (winners) for the same period
+    const winnerQb = this.winnerRepo
+      .createQueryBuilder("winner")
+      .select("SUM(winner.amount)", "totalReleased");
+
+    if (start) {
+      winnerQb.andWhere("winner.createdAt >= :start", { start });
+    }
+    if (end) {
+      winnerQb.andWhere("winner.createdAt < :end", { end });
+    }
+
+    const winnerRow = await winnerQb.getRawOne();
+    const totalReleased = Number(winnerRow?.totalReleased ?? 0);
+    const retainedAmount = paidAmount - totalReleased;
+
     return {
       paidCount: Number(row?.paidCount ?? 0),
-      paidAmount: Number(row?.paidAmount ?? 0),
+      paidAmount,
       pendingCount: Number(row?.pendingCount ?? 0),
       failedCount: Number(row?.failedCount ?? 0),
+      totalReleased,
+      retainedAmount,
     };
   }
 }

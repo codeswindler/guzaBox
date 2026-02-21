@@ -8,6 +8,8 @@ type OverviewBlock = {
   paidAmount: number;
   pendingCount: number;
   failedCount: number;
+  totalReleased?: number;
+  retainedAmount?: number;
 };
 
 type Overview = {
