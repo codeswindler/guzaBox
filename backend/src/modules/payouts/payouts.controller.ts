@@ -44,8 +44,14 @@ export class PayoutsController {
   }
 
   @Get("releases")
-  async listReleases() {
-    return this.payoutsService.listReleases();
+  async listReleases(
+    @Query("page") page?: string,
+    @Query("limit") limit?: string
+  ) {
+    return this.payoutsService.listReleases({
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
   }
 
   @Get("winners")

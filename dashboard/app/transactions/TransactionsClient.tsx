@@ -68,6 +68,8 @@ const normalizeKpis = (value: unknown): Kpis => {
   };
 };
 
+const ITEMS_PER_PAGE = 50;
+
 export default function TransactionsClient() {
   const [items, setItems] = useState<Transaction[]>([]);
   const [status, setStatus] = useState("");
@@ -75,6 +77,13 @@ export default function TransactionsClient() {
   const [to, setTo] = useState("");
   const [toasts, setToasts] = useState<string[]>([]);
   const [kpis, setKpis] = useState<Kpis | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState<{
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  } | null>(null);
   const [kpiRange, setKpiRange] = useState<"today" | "last7" | "allTime" | "custom">(
     "today"
   );
@@ -167,7 +176,10 @@ export default function TransactionsClient() {
     }
     try {
       setError("");
-      const params: Record<string, string> = {};
+      const params: Record<string, string> = {
+        page: currentPage.toString(),
+        limit: ITEMS_PER_PAGE.toString(),
+      };
       if (status) params.status = status;
       const fromValue = toSqlDateTime(from);
       const toValue = toSqlDateTime(to);
@@ -177,7 +189,19 @@ export default function TransactionsClient() {
         api.get("/payments/transactions", { params }),
         api.get("/payments/kpis"),
       ]);
-      const data: Transaction[] = Array.isArray(txRes.data) ? txRes.data : [];
+      
+      // Handle new paginated response format
+      let data: Transaction[] = [];
+      if (txRes.data && txRes.data.data && Array.isArray(txRes.data.data)) {
+        // New paginated format
+        data = txRes.data.data;
+        setPagination(txRes.data.pagination || null);
+      } else if (Array.isArray(txRes.data)) {
+        // Fallback to old format
+        data = txRes.data;
+        setPagination(null);
+      }
+      
       if (data.length > 0) {
         const latestId = data[0].id;
         if (lastSeenRef.current && latestId !== lastSeenRef.current) {
@@ -246,10 +270,14 @@ export default function TransactionsClient() {
   };
 
   useEffect(() => {
+    setCurrentPage(1); // Reset to first page when filters change
+  }, [status, from, to]);
+
+  useEffect(() => {
     load();
     const timer = setInterval(load, mockEnabled ? 12000 : 10000);
     return () => clearInterval(timer);
-  }, [mockEnabled, status, from, to]);
+  }, [mockEnabled, status, from, to, currentPage]);
 
   useEffect(() => {
     if (kpiRange === "custom" && customStartDate && customEndDate) {
@@ -260,9 +288,8 @@ export default function TransactionsClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kpiRange, customStartDate, customEndDate]);
 
-  const visibleItems = status
-    ? items.filter((item) => item.status === status)
-    : items;
+  // No need to filter client-side since we're paginating server-side
+  const visibleItems = items;
 
   const currentKpi = useMemo(() => {
     if (kpiRange === "custom") {
@@ -537,8 +564,9 @@ export default function TransactionsClient() {
             Clear Filters
           </button>
           <span className="subtle">
-            Found {visibleItems.length} record
-            {visibleItems.length === 1 ? "" : "s"}
+            {pagination
+              ? `Found ${pagination.total} record${pagination.total === 1 ? "" : "s"} (Page ${pagination.page} of ${pagination.totalPages})`
+              : `Found ${visibleItems.length} record${visibleItems.length === 1 ? "" : "s"}`}
           </span>
           <button
             onClick={async () => {
@@ -553,7 +581,8 @@ export default function TransactionsClient() {
                 const res = await api.get("/payments/transactions", {
                   params: exportParams,
                 });
-                const rows: Transaction[] = res.data ?? [];
+                // Handle both paginated and non-paginated responses
+                const rows: Transaction[] = res.data?.data ?? (Array.isArray(res.data) ? res.data : []);
                 const header = [
                   "id",
                   "phoneNumber",
@@ -631,6 +660,27 @@ export default function TransactionsClient() {
             ))}
           </tbody>
         </table>
+        {pagination && pagination.totalPages > 1 && (
+          <div style={{ marginTop: "1rem", display: "flex", gap: "0.5rem", alignItems: "center", justifyContent: "center" }}>
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              style={{ padding: "0.5rem 1rem" }}
+            >
+              Previous
+            </button>
+            <span className="subtle">
+              Page {pagination.page} of {pagination.totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(pagination.totalPages, p + 1))}
+              disabled={currentPage >= pagination.totalPages}
+              style={{ padding: "0.5rem 1rem" }}
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
       {toasts.length > 0 && (
         <div className="toast-stack">

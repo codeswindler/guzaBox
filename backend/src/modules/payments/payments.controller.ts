@@ -31,7 +31,9 @@ export class PaymentsController {
   async listTransactions(
     @Query("status") status?: string,
     @Query("from") from?: string,
-    @Query("to") to?: string
+    @Query("to") to?: string,
+    @Query("page") page?: string,
+    @Query("limit") limit?: string
   ) {
     await this.paymentsService.markStalePendingTransactions();
     const qb = this.paymentRepo.createQueryBuilder("tx").orderBy("tx.createdAt", "DESC");
@@ -46,7 +48,24 @@ export class PaymentsController {
       qb.andWhere("tx.createdAt <= :to", { to });
     }
 
-    return qb.getMany();
+    // Add pagination with default limit of 50
+    const pageNum = page ? parseInt(page, 10) : 1;
+    const limitNum = limit ? parseInt(limit, 10) : 50;
+    const skip = (pageNum - 1) * limitNum;
+
+    qb.skip(skip).take(limitNum);
+
+    const [data, total] = await qb.getManyAndCount();
+
+    return {
+      data,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum),
+      },
+    };
   }
 
   @Get("kpis")

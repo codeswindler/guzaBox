@@ -13,6 +13,7 @@ import { AddPayerName1700000000002 } from "../migrations/1700000000002-add-payer
 import { AddInstantWinSettings1700000000003 } from "../migrations/1700000000003-add-instant-win-settings";
 import { AddAccountReference1700000000004 } from "../migrations/1700000000004-add-account-reference";
 import { AddAdminSessions1700000000005 } from "../migrations/1700000000005-add-admin-sessions";
+import { AddPerformanceIndexes1700000000006 } from "../migrations/1700000000006-add-performance-indexes";
 import { AdminSession } from "../modules/auth/entities/admin-session.entity";
 
 export const AppDataSource = new DataSource({
@@ -41,6 +42,7 @@ export const AppDataSource = new DataSource({
     AddInstantWinSettings1700000000003,
     AddAccountReference1700000000004,
     AddAdminSessions1700000000005,
+    AddPerformanceIndexes1700000000006,
   ],
   synchronize: process.env.DB_SYNC === "true",
   logging: process.env.DB_LOGGING === "true",

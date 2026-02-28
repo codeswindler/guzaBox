@@ -220,8 +220,42 @@ export class PayoutsService {
     return { release, winners };
   }
 
-  async listReleases() {
-    return this.releaseRepo.find({ order: { createdAt: "DESC" } });
+  async listReleases(options: { page?: number; limit?: number } = {}) {
+    const { page, limit } = options;
+    
+    if (page !== undefined && limit !== undefined) {
+      const skip = (page - 1) * limit;
+      const [data, total] = await this.releaseRepo.findAndCount({
+        order: { createdAt: "DESC" },
+        skip,
+        take: limit,
+      });
+      return {
+        data,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      };
+    }
+    
+    // Default limit of 50 if no pagination specified
+    const defaultLimit = 50;
+    const [data, total] = await this.releaseRepo.findAndCount({
+      order: { createdAt: "DESC" },
+      take: defaultLimit,
+    });
+    return {
+      data,
+      pagination: {
+        page: 1,
+        limit: defaultLimit,
+        total,
+        totalPages: Math.ceil(total / defaultLimit),
+      },
+    };
   }
 
   async listWinners(options: {
@@ -292,9 +326,10 @@ export class PayoutsService {
       const { startToday } = this.getNairobiDayBounds();
       const todayDateStr = this.formatDateForGrouping(startToday);
       
-      // Build query for paid transactions
+      // Build query for paid transactions - only select needed fields
       const txQueryBuilder = this.paymentRepo
         .createQueryBuilder("tx")
+        .select(["tx.id", "tx.amount", "tx.createdAt"])
         .where("tx.status = :status", { status: "PAID" });
 
       // Apply date filters if provided
@@ -305,6 +340,13 @@ export class PayoutsService {
         const toDate = new Date(to);
         toDate.setHours(23, 59, 59, 999);
         txQueryBuilder.andWhere("tx.createdAt <= :to", { to: toDate });
+      }
+
+      // If no date filter, limit to last 90 days to prevent loading too much data
+      if (!from && !to) {
+        const defaultFrom = new Date();
+        defaultFrom.setDate(defaultFrom.getDate() - 90);
+        txQueryBuilder.andWhere("tx.createdAt >= :defaultFrom", { defaultFrom });
       }
 
       txQueryBuilder.orderBy("tx.createdAt", "DESC");
