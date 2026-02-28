@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import api from "../../lib/api";
 
 // Hook to detect clicks outside an element
@@ -161,7 +161,7 @@ export default function TransactionsClient() {
     return { today, yesterday, last7, prev7, last30, prev30, allTime };
   };
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (mockEnabled) {
       const nextTx = buildMockTx();
       setItems((prev) => [nextTx, ...prev].slice(0, 15));
@@ -227,7 +227,7 @@ export default function TransactionsClient() {
     } catch (error) {
       setError("Live transactions unavailable. Check API connection.");
     }
-  };
+  }, [mockEnabled, currentPage, status, from, to]);
 
   const [customKpi, setCustomKpi] = useState<KpiBlock | null>(null);
   const [customKpiLoading, setCustomKpiLoading] = useState(false);
@@ -277,7 +277,7 @@ export default function TransactionsClient() {
     load();
     const timer = setInterval(load, mockEnabled ? 12000 : 10000);
     return () => clearInterval(timer);
-  }, [mockEnabled, status, from, to, currentPage]);
+  }, [load, mockEnabled]);
 
   useEffect(() => {
     if (kpiRange === "custom" && customStartDate && customEndDate) {
