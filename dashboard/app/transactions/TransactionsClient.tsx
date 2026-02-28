@@ -420,17 +420,14 @@ export default function TransactionsClient() {
     
     const numValue = typeof value === "string" ? parseFloat(value) : value;
     
-    if (!Number.isFinite(numValue) || isNaN(numValue)) {
-      return "Ksh 0";
-    }
-    if (!Number.isFinite(value) || isNaN(value)) {
+    if (!Number.isFinite(numValue) || isNaN(numValue as number)) {
       return "Ksh 0";
     }
     return new Intl.NumberFormat("en-KE", {
       style: "currency",
       currency: "KES",
       maximumFractionDigits: 0,
-    }).format(value);
+    }).format(numValue);
   };
 
   const formatDateTime = (dateStr: string | Date) => {
