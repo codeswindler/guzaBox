@@ -270,9 +270,33 @@ export default function TransactionsClient() {
       if (toValue) params.to = toValue;
       
       const res = await api.get("/payments/transactions", { params });
-      const data: Transaction[] = Array.isArray(res.data) ? res.data : [];
+      
+      // Handle both paginated and non-paginated responses
+      let data: Transaction[] = [];
+      try {
+        if (res?.data?.data && Array.isArray(res.data.data)) {
+          // New paginated format
+          data = res.data.data;
+        } else if (Array.isArray(res?.data)) {
+          // Fallback to old format
+          data = res.data;
+        } else {
+          // Unexpected format - ensure we have an array
+          data = [];
+        }
+      } catch (parseError) {
+        console.error("Error parsing custom KPI data:", parseError);
+        data = [];
+      }
+      
+      // Ensure data is an array before calling reduce
+      if (!Array.isArray(data)) {
+        console.warn("Data is not an array:", data);
+        data = [];
+      }
+      
       const amount = data.reduce((sum, tx) => {
-        const txAmount = Number(tx.amount);
+        const txAmount = Number(tx?.amount || 0);
         return sum + (Number.isFinite(txAmount) ? txAmount : 0);
       }, 0);
       setCustomKpi({ 
