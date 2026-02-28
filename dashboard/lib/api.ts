@@ -50,13 +50,15 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Log 404 errors for debugging
-    if (error.response?.status === 404) {
-      console.error(`API 404 Error: ${error.config?.method?.toUpperCase()} ${error.config?.url}`, {
-        baseURL: apiBaseUrl,
-        fullURL: error.config?.baseURL + error.config?.url,
-      });
-    }
+    // Log all API errors for debugging
+    console.error(`API Error: ${error.config?.method?.toUpperCase()} ${error.config?.url}`, {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      baseURL: apiBaseUrl,
+      fullURL: error.config?.baseURL + error.config?.url,
+      data: error.response?.data,
+      message: error.message,
+    });
     return Promise.reject(error);
   }
 );

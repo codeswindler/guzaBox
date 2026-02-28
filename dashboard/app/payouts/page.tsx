@@ -102,7 +102,9 @@ export default function PayoutsPage() {
         setCollectionsPagination(null);
       }
     } catch (err: any) {
-      setError("Failed to load collections. Ensure API access.");
+      console.error("Error loading collections:", err);
+      const errorMsg = err?.response?.data?.message || err?.message || "Unknown error";
+      setError(`Failed to load collections: ${errorMsg}. Ensure API access.`);
       setCollections([]);
       setCollectionsPagination(null);
     }
@@ -130,7 +132,9 @@ export default function PayoutsPage() {
         setWinnersPagination(null);
       }
     } catch (err: any) {
-      setError("Failed to load winners. Ensure API access.");
+      console.error("Error loading winners:", err);
+      const errorMsg = err?.response?.data?.message || err?.message || "Unknown error";
+      setError(`Failed to load winners: ${errorMsg}. Ensure API access.`);
       setWinners([]);
       setWinnersPagination(null);
     }
