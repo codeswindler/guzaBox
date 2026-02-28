@@ -1,8 +1,8 @@
 import axios from "axios";
 
 // Determine API base URL
-// In production, nginx proxies /api/* to backend (localhost:4000)
-// For local dev, use localhost:4000 directly
+// In production, nginx has direct routes for /admin, /auth, /payments, /ussd
+// So we use empty base URL (relative paths) to match nginx routing
 const getApiBaseUrl = () => {
   // Allow override via environment variable
   if (process.env.NEXT_PUBLIC_API_URL) {
@@ -18,8 +18,9 @@ const getApiBaseUrl = () => {
       return "http://localhost:4000";
     }
     
-    // In production, use /api prefix which nginx proxies to backend
-    return "/api";
+    // In production, use empty string (relative URLs) to match nginx direct routes
+    // Nginx has: location ~ ^/(admin|auth|payments|ussd) which handles these directly
+    return "";
   }
   
   // Server-side default (for SSR)
