@@ -190,42 +190,60 @@ export default function TransactionsClient() {
         api.get("/payments/kpis"),
       ]);
       
-      // Handle new paginated response format
+      // Handle new paginated response format with better error handling
       let data: Transaction[] = [];
-      if (txRes.data && txRes.data.data && Array.isArray(txRes.data.data)) {
-        // New paginated format
-        data = txRes.data.data;
-        setPagination(txRes.data.pagination || null);
-      } else if (Array.isArray(txRes.data)) {
-        // Fallback to old format
-        data = txRes.data;
+      try {
+        if (txRes?.data?.data && Array.isArray(txRes.data.data)) {
+          // New paginated format
+          data = txRes.data.data;
+          setPagination(txRes.data.pagination || null);
+        } else if (Array.isArray(txRes?.data)) {
+          // Fallback to old format
+          data = txRes.data;
+          setPagination(null);
+        } else if (txRes?.data) {
+          // Handle unexpected format - try to extract data
+          console.warn("Unexpected API response format:", txRes.data);
+          data = [];
+          setPagination(null);
+        }
+      } catch (parseError) {
+        console.error("Error parsing transaction data:", parseError);
+        data = [];
         setPagination(null);
       }
       
       if (data.length > 0) {
-        const latestId = data[0].id;
-        if (lastSeenRef.current && latestId !== lastSeenRef.current) {
+        const latestId = data[0]?.id;
+        if (latestId && lastSeenRef.current && latestId !== lastSeenRef.current) {
           const newOnes = data.filter(
-            (tx) => tx.id !== lastSeenRef.current && tx.status === "PAID"
+            (tx) => tx?.id !== lastSeenRef.current && tx?.status === "PAID"
           );
           if (newOnes.length > 0) {
             setToasts((prev) => [
               ...newOnes.map(
                 (tx) =>
-                  `Incoming Ksh ${tx.amount} from ${
-                    tx.payerName || tx.phoneNumber
+                  `Incoming Ksh ${tx?.amount || 0} from ${
+                    tx?.payerName || tx?.phoneNumber || "Unknown"
                   }`
               ),
               ...prev,
             ]);
           }
         }
-        lastSeenRef.current = latestId;
+        if (latestId) {
+          lastSeenRef.current = latestId;
+        }
       }
       setItems(data);
-      setKpis(normalizeKpis(kpiRes.data));
+      if (kpiRes?.data) {
+        setKpis(normalizeKpis(kpiRes.data));
+      }
     } catch (error) {
+      console.error("Error loading transactions:", error);
       setError("Live transactions unavailable. Check API connection.");
+      setItems([]);
+      setPagination(null);
     }
   }, [mockEnabled, currentPage, status, from, to]);
 
