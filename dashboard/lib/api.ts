@@ -4,20 +4,35 @@ import axios from "axios";
 // In production, NEXT_PUBLIC_API_URL should be set to the backend URL
 // If not set, try to infer from current hostname
 const getApiBaseUrl = () => {
-  if (process.env.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL.trim();
+  const envUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (envUrl) {
+    const trimmed = envUrl.trim();
+    // If it's localhost and we're in browser, we need to use the actual backend URL
+    // or rely on a reverse proxy
+    if (trimmed && trimmed !== "http://localhost:4000") {
+      return trimmed;
+    }
   }
   
   if (typeof window !== "undefined") {
-    // In browser: try to use same origin with port 4000, or relative /api
+    // In browser: check if we're on localhost
     const hostname = window.location.hostname;
-    // If on localhost, use localhost:4000
+    const protocol = window.location.protocol;
+    const port = window.location.port;
+    
+    // If on localhost, try localhost:4000 (for local dev)
     if (hostname === "localhost" || hostname === "127.0.0.1") {
       return "http://localhost:4000";
     }
-    // In production, assume backend is on same domain but different port or subdomain
-    // Default to relative path which should be proxied
-    return "";
+    
+    // In production, try to construct backend URL from current hostname
+    // Option 1: Same domain, different port (if backend is exposed)
+    // Option 2: Use relative URLs (if reverse proxy is set up)
+    // For now, try same origin with :4000, fallback to empty (relative)
+    // This assumes either:
+    // - Backend is exposed on :4000 of same domain
+    // - Or there's a reverse proxy handling /api/* -> backend
+    return ""; // Empty means relative URLs - requires reverse proxy or Next.js rewrites
   }
   
   // Server-side default
