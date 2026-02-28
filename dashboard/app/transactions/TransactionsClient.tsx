@@ -193,17 +193,24 @@ export default function TransactionsClient() {
       // Handle new paginated response format with better error handling
       let data: Transaction[] = [];
       try {
-        if (txRes?.data?.data && Array.isArray(txRes.data.data)) {
-          // New paginated format
-          data = txRes.data.data;
-          setPagination(txRes.data.pagination || null);
-        } else if (Array.isArray(txRes?.data)) {
-          // Fallback to old format
-          data = txRes.data;
+        const responseBody = txRes?.data;
+        
+        if (responseBody?.data && Array.isArray(responseBody.data)) {
+          // New paginated format: { data: [...], pagination: {...} }
+          data = responseBody.data;
+          setPagination(responseBody.pagination || null);
+        } else if (Array.isArray(responseBody)) {
+          // Fallback to old format: direct array
+          data = responseBody;
           setPagination(null);
-        } else if (txRes?.data) {
+        } else if (responseBody && typeof responseBody === 'object') {
           // Handle unexpected format - try to extract data
-          console.warn("Unexpected API response format:", txRes.data);
+          console.warn("Unexpected API response format:", responseBody);
+          data = [];
+          setPagination(null);
+        } else {
+          // No data or unexpected type
+          console.warn("API response is not an object or array:", typeof responseBody, responseBody);
           data = [];
           setPagination(null);
         }
@@ -211,6 +218,12 @@ export default function TransactionsClient() {
         console.error("Error parsing transaction data:", parseError);
         data = [];
         setPagination(null);
+      }
+      
+      // Final safety check - ensure data is always an array
+      if (!Array.isArray(data)) {
+        console.error("Data is not an array after parsing:", typeof data, data);
+        data = [];
       }
       
       if (data.length > 0) {
@@ -274,14 +287,22 @@ export default function TransactionsClient() {
       // Handle both paginated and non-paginated responses
       let data: Transaction[] = [];
       try {
-        if (res?.data?.data && Array.isArray(res.data.data)) {
-          // New paginated format
-          data = res.data.data;
-        } else if (Array.isArray(res?.data)) {
-          // Fallback to old format
-          data = res.data;
+        // Axios wraps the response, so res.data is the actual response body
+        const responseBody = res?.data;
+        
+        if (responseBody?.data && Array.isArray(responseBody.data)) {
+          // New paginated format: { data: [...], pagination: {...} }
+          data = responseBody.data;
+        } else if (Array.isArray(responseBody)) {
+          // Fallback to old format: direct array
+          data = responseBody;
+        } else if (responseBody && typeof responseBody === 'object') {
+          // Try to find an array in the response
+          console.warn("Unexpected API response format:", responseBody);
+          data = [];
         } else {
-          // Unexpected format - ensure we have an array
+          // Not an object or array
+          console.warn("API response is not an object or array:", typeof responseBody, responseBody);
           data = [];
         }
       } catch (parseError) {
@@ -289,9 +310,9 @@ export default function TransactionsClient() {
         data = [];
       }
       
-      // Ensure data is an array before calling reduce
+      // Final safety check - ensure data is an array before calling reduce
       if (!Array.isArray(data)) {
-        console.warn("Data is not an array:", data);
+        console.error("Data is still not an array after parsing:", typeof data, data);
         data = [];
       }
       
