@@ -4,11 +4,6 @@ import axios from "axios";
 // In production, nginx has direct routes for /admin, /auth, /payments, /ussd
 // So we use empty base URL (relative paths) to match nginx routing
 const getApiBaseUrl = () => {
-  // Allow override via environment variable
-  if (process.env.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL.trim();
-  }
-  
   if (typeof window !== "undefined") {
     // In browser: check if we're on localhost
     const hostname = window.location.hostname;
@@ -20,7 +15,13 @@ const getApiBaseUrl = () => {
     
     // In production, use empty string (relative URLs) to match nginx direct routes
     // Nginx has: location ~ ^/(admin|auth|payments|ussd) which handles these directly
+    // DO NOT use NEXT_PUBLIC_API_URL in production browser - it causes CORS issues
     return "";
+  }
+  
+  // Server-side: allow env override for SSR
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL.trim();
   }
   
   // Server-side default (for SSR)
