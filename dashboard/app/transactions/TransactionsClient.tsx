@@ -411,7 +411,18 @@ export default function TransactionsClient() {
     return Math.round(delta * 10) / 10;
   }, [currentKpi, kpiRange]);
 
-  const formatMoney = (value: number) => {
+  const formatMoney = (value: number | string | null | undefined) => {
+    // TypeORM decimal columns are returned as strings in JSON
+    // Convert to number if it's a string
+    if (value == null) {
+      return "Ksh 0";
+    }
+    
+    const numValue = typeof value === "string" ? parseFloat(value) : value;
+    
+    if (!Number.isFinite(numValue) || isNaN(numValue)) {
+      return "Ksh 0";
+    }
     if (!Number.isFinite(value) || isNaN(value)) {
       return "Ksh 0";
     }
