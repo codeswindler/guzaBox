@@ -66,10 +66,26 @@ export default function OverviewClient() {
         api.get("/admin/instant-win/status"),
       ]);
       setOverview(overviewRes.data);
-      setReleases(releasesRes.data ?? []);
+      
+      // Handle both paginated and non-paginated responses
+      let releasesData: Release[] = [];
+      const responseBody = releasesRes?.data;
+      if (responseBody?.data && Array.isArray(responseBody.data)) {
+        // Paginated format: { data: [...], pagination: {...} }
+        releasesData = responseBody.data;
+      } else if (Array.isArray(responseBody)) {
+        // Direct array format
+        releasesData = responseBody;
+      } else {
+        // Fallback to empty array
+        releasesData = [];
+      }
+      setReleases(releasesData);
       setInstantWinStatus(normalizeInstantWinStatus(instantWinRes.data));
     } catch (err: any) {
       setError("Live overview unavailable. Ensure API access and seed data.");
+      // Ensure releases is always an array even on error
+      setReleases([]);
     }
   };
 
@@ -79,10 +95,13 @@ export default function OverviewClient() {
     return () => clearInterval(timer);
   }, []);
 
-  const totalWinners = releases.reduce(
-    (sum, release) => sum + Number(release.totalWinners ?? 0),
-    0
-  );
+  // Ensure releases is always an array before calling reduce
+  const totalWinners = Array.isArray(releases)
+    ? releases.reduce(
+        (sum, release) => sum + Number(release?.totalWinners ?? 0),
+        0
+      )
+    : 0;
 
   return (
     <div>
