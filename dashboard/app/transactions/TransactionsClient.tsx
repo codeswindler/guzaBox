@@ -582,8 +582,8 @@ export default function TransactionsClient() {
             Clear Filters
           </button>
           <span className="subtle">
-            {pagination
-              ? `Found ${pagination.total} record${pagination.total === 1 ? "" : "s"} (Page ${pagination.page} of ${pagination.totalPages})`
+            {pagination && pagination.total !== undefined
+              ? `Found ${pagination.total} record${pagination.total === 1 ? "" : "s"} (Page ${pagination.page || 1} of ${pagination.totalPages || 1})`
               : `Found ${visibleItems.length} record${visibleItems.length === 1 ? "" : "s"}`}
           </span>
           <button
@@ -678,7 +678,7 @@ export default function TransactionsClient() {
             ))}
           </tbody>
         </table>
-        {pagination && pagination.totalPages > 1 && (
+        {pagination && pagination.totalPages !== undefined && pagination.totalPages > 1 && (
           <div style={{ marginTop: "1rem", display: "flex", gap: "0.5rem", alignItems: "center", justifyContent: "center" }}>
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
@@ -688,11 +688,11 @@ export default function TransactionsClient() {
               Previous
             </button>
             <span className="subtle">
-              Page {pagination.page} of {pagination.totalPages}
+              Page {pagination.page || 1} of {pagination.totalPages || 1}
             </span>
             <button
-              onClick={() => setCurrentPage((p) => Math.min(pagination.totalPages, p + 1))}
-              disabled={currentPage >= pagination.totalPages}
+              onClick={() => setCurrentPage((p) => Math.min(pagination.totalPages || 1, p + 1))}
+              disabled={currentPage >= (pagination.totalPages || 1)}
               style={{ padding: "0.5rem 1rem" }}
             >
               Next
